@@ -4,7 +4,7 @@ compatibility_date = "2024-01-01"
 workers_dev = true
 
 [build]
-command = "cargo install -q worker-build && worker-build --release"
+command = "cargo install -q -f worker-build && worker-build --release"
 
 [[r2_buckets]]
 binding = "google_drive_pics"
