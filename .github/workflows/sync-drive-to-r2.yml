@@ -36,8 +36,8 @@ jobs:
       - name: Sync from Google Drive to R2
         run: |
           rclone sync \
-            gdrive:${{ env.GDRIVE_FOLDER_PATH }} \
-            r2:${{ env.R2_BUCKET_NAME }}/${{ env.R2_DESTINATION_PATH }} \
+            gdrive:"${{ vars.GDRIVE_FOLDER_PATH }}" \
+            r2:${{ vars.R2_BUCKET_NAME }}/${{ vars.R2_DESTINATION_PATH }} \
             --progress \
             --log-level INFO \
             --transfers 4 \
@@ -48,4 +48,4 @@ jobs:
         if: always()
         run: |
           echo "Sync completed!"
-          rclone size r2:${{ env.R2_BUCKET_NAME }}/${{ env.R2_DESTINATION_PATH }}
+          rclone size r2:${{ vars.R2_BUCKET_NAME }}/${{ vars.R2_DESTINATION_PATH }}
