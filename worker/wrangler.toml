@@ -16,6 +16,13 @@ binding = "thumbnails"
 bucket_name = "thumbnails"
 preview_bucket_name = "thumbnails"
 
+[observability]
+[observability.logs]
+enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
 # To deploy:
 # 1. Install wrangler: npm install -g wrangler
 # 2. Login: wrangler login
