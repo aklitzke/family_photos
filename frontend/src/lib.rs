@@ -358,11 +358,11 @@ impl eframe::App for FamilyPhotosApp {
                             // Handle pinch-to-zoom (trackpad gesture)
                             let zoom_delta = ui.input(|i| i.zoom_delta());
                             if zoom_delta != 1.0 {
-                                self.full_image_zoom = (self.full_image_zoom * zoom_delta).clamp(0.5, 5.0);
+                                self.full_image_zoom = (self.full_image_zoom * zoom_delta).clamp(0.1, 50.0);
                             }
 
                             // Zoom slider
-                            if ui.add(egui::Slider::new(&mut self.full_image_zoom, 0.5..=5.0)
+                            if ui.add(egui::Slider::new(&mut self.full_image_zoom, 0.1..=50.0)
                                 .text("")
                                 .logarithmic(true)).changed() {
                             }
@@ -489,6 +489,7 @@ impl eframe::App for FamilyPhotosApp {
                     if bg_response.clicked() {
                         self.selected_image = None;
                         self.full_image_zoom = 1.0;
+                        self.full_image_scroll_offset = Vec2::ZERO;
                     }
                 });
         } else {
