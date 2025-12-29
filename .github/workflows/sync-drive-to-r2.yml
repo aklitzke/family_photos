@@ -41,6 +41,7 @@ jobs:
             gdrive:"${{ vars.GDRIVE_FOLDER_PATH }}" \
             r2:${{ vars.R2_BUCKET_NAME }}/${{ vars.R2_DESTINATION_PATH }} \
             --progress \
+            --immutable \
             --log-level INFO \
             --transfers 4 \
             --checkers 8 \
