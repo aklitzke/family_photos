@@ -9,10 +9,12 @@ command = "cargo install -q worker-build && worker-build --release"
 [[r2_buckets]]
 binding = "google_drive_pics"
 bucket_name = "google-drive-pics"
+preview_bucket_name = "google-drive-pics"
 
 [[r2_buckets]]
 binding = "thumbnails"
 bucket_name = "thumbnails"
+preview_bucket_name = "thumbnails"
 
 # To deploy:
 # 1. Install wrangler: npm install -g wrangler

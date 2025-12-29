@@ -6,6 +6,12 @@ use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
+const API_BASE_URL: &str = if cfg!(debug_assertions) {
+    "http://localhost:8787"
+} else {
+    ""
+};
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct ImageMetadata {
     id: String,
@@ -406,7 +412,8 @@ impl eframe::App for FamilyPhotosApp {
 }
 
 async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
-    let response = ehttp::fetch_async(ehttp::Request::get(url))
+    let full_url = format!("{}{}", API_BASE_URL, url);
+    let response = ehttp::fetch_async(ehttp::Request::get(&full_url))
         .await
         .map_err(|e| format!("Fetch failed: {}", e))?;
 
@@ -421,7 +428,8 @@ async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, Stri
 }
 
 async fn fetch_image(url: &str) -> Result<Vec<u8>, String> {
-    let response = ehttp::fetch_async(ehttp::Request::get(url))
+    let full_url = format!("{}{}", API_BASE_URL, url);
+    let response = ehttp::fetch_async(ehttp::Request::get(&full_url))
         .await
         .map_err(|e| format!("Fetch failed: {}", e))?;
 
