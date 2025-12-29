@@ -1,0 +1,57 @@
+name: Deploy Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Frontend to Cloudflare Pages
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-frontend-${{ hashFiles('frontend/Cargo.lock') }}
+
+      - name: Install trunk
+        run: |
+          if ! command -v trunk &> /dev/null; then
+            cargo install trunk
+          fi
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: trunk build --release
+
+      - name: Create _redirects for API proxy
+        env:
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+        run: |
+          echo "/api/* ${WORKER_URL}/api/:splat 200" > frontend/dist/_redirects
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy frontend/dist
