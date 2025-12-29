@@ -70,8 +70,8 @@ struct FamilyPhotosApp {
     thumbnails: HashMap<String, TextureHandle>,
     thumbnail_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     selected_image: Option<String>,
-    full_image: Option<TextureHandle>,
-    full_image_loading: Option<Arc<Mutex<LoadState<Vec<u8>>>>>,
+    full_images: HashMap<String, TextureHandle>,
+    full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     health: LoadState<HealthResponse>,
     health_loading: Option<Arc<Mutex<LoadState<HealthResponse>>>>,
 }
@@ -85,8 +85,8 @@ impl FamilyPhotosApp {
             thumbnails: HashMap::new(),
             thumbnail_loading: HashMap::new(),
             selected_image: None,
-            full_image: None,
-            full_image_loading: None,
+            full_images: HashMap::new(),
+            full_images_loading: HashMap::new(),
             health: LoadState::NotStarted,
             health_loading: None,
         }
@@ -160,12 +160,12 @@ impl FamilyPhotosApp {
     }
 
     fn load_full_image(&mut self, id: &str, ctx: &egui::Context) {
-        if self.full_image_loading.is_some() {
+        if self.full_images.contains_key(id) || self.full_images_loading.contains_key(id) {
             return;
         }
 
         let loading_state = Arc::new(Mutex::new(LoadState::Loading));
-        self.full_image_loading = Some(loading_state.clone());
+        self.full_images_loading.insert(id.to_string(), loading_state.clone());
 
         let id_clone = id.to_string();
         let ctx_clone = ctx.clone();
@@ -213,32 +213,32 @@ impl FamilyPhotosApp {
         }
     }
 
-    fn process_loaded_full_image(&mut self, ctx: &egui::Context) {
-        let should_update = if let Some(loading_state) = &self.full_image_loading {
+    fn process_loaded_full_images(&mut self, ctx: &egui::Context) {
+        let mut completed = Vec::new();
+
+        for (id, loading_state) in &self.full_images_loading {
             let state = loading_state.lock().unwrap();
             match &*state {
                 LoadState::Loaded(data) => {
                     if let Some(color_image) = load_image_from_bytes(data) {
                         let texture = ctx.load_texture(
-                            "full_image",
+                            format!("full_image_{}", id),
                             color_image,
                             Default::default(),
                         );
-                        Some(Some(texture))
-                    } else {
-                        Some(None)
+                        self.full_images.insert(id.clone(), texture);
                     }
+                    completed.push(id.clone());
                 }
-                LoadState::Failed(_) => Some(None),
-                _ => None,
+                LoadState::Failed(_) => {
+                    completed.push(id.clone());
+                }
+                _ => {}
             }
-        } else {
-            None
-        };
+        }
 
-        if let Some(new_texture) = should_update {
-            self.full_image = new_texture;
-            self.full_image_loading = None;
+        for id in completed {
+            self.full_images_loading.remove(&id);
         }
     }
 
@@ -289,7 +289,7 @@ impl eframe::App for FamilyPhotosApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.process_loaded_images();
         self.process_loaded_thumbnails(ctx);
-        self.process_loaded_full_image(ctx);
+        self.process_loaded_full_images(ctx);
         self.process_loaded_health();
 
         egui::SidePanel::left("sidebar")
@@ -311,45 +311,33 @@ impl eframe::App for FamilyPhotosApp {
 
         // Show full image overlay if selected
         if let Some(selected_id) = self.selected_image.clone() {
-            // Dark background overlay
-            egui::Area::new(egui::Id::new("overlay_background"))
-                .fixed_pos(egui::pos2(0.0, 0.0))
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE)
                 .show(ctx, |ui| {
                     let screen_rect = ctx.viewport_rect();
-                    let painter = ui.painter();
-                    painter.rect_filled(
+
+                    // Draw dark background
+                    ui.painter().rect_filled(
                         screen_rect,
                         0.0,
                         egui::Color32::from_black_alpha(200),
                     );
 
-                    // Detect click on background to close
-                    let response = ui.allocate_rect(screen_rect, egui::Sense::click());
-                    if response.clicked() {
-                        self.selected_image = None;
-                        self.full_image = None;
-                        self.full_image_loading = None;
-                    }
-                });
+                    // Detect click on background to close (but don't consume the click)
+                    let bg_response = ui.interact(screen_rect, egui::Id::new("overlay_bg"), egui::Sense::click());
 
-            // Center panel for full image
-            egui::CentralPanel::default()
-                .frame(egui::Frame::NONE)
-                .show(ctx, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.add_space(50.0);
 
                         // Close button
                         if ui.button(egui::RichText::new("✕ Close").size(20.0)).clicked() {
                             self.selected_image = None;
-                            self.full_image = None;
-                            self.full_image_loading = None;
                         }
 
                         ui.add_space(20.0);
 
                         // Show full image or loading message
-                        if let Some(texture) = &self.full_image {
+                        if let Some(texture) = self.full_images.get(&selected_id) {
                             let available_size = ui.available_size();
                             let max_width = available_size.x * 0.9;
                             let max_height = available_size.y * 0.8;
@@ -361,14 +349,15 @@ impl eframe::App for FamilyPhotosApp {
 
                             let display_size = texture_size * scale;
                             ui.image((texture.id(), display_size));
-                        } else if self.full_image_loading.is_some() {
-                            ui.label(egui::RichText::new("Loading...").size(24.0));
                         } else {
-                            // Start loading
                             self.load_full_image(&selected_id, ctx);
                             ui.label(egui::RichText::new("Loading...").size(24.0));
                         }
                     });
+
+                    if bg_response.clicked() {
+                        self.selected_image = None;
+                    }
                 });
         } else {
             egui::CentralPanel::default().show(ctx, |ui| {
@@ -398,61 +387,92 @@ impl eframe::App for FamilyPhotosApp {
                                     );
                                 }
                                 LoadState::Loaded(images) => {
-                                    let thumbnail_size = 250.0;
-                                    let spacing = 20.0;
-                                    let available_width = ui.available_width();
-                                    let cols = ((available_width + spacing) / (thumbnail_size + spacing))
-                                        .max(1.0) as usize;
+                                    let thumbnail_height = 80.0;
 
                                     for image in &images {
                                         self.load_thumbnail(&image.id, ctx);
                                     }
 
-                                    egui::Grid::new("image_grid")
-                                        .spacing([spacing, spacing])
-                                        .show(ui, |ui| {
-                                            for (idx, image) in images.iter().enumerate() {
-                                                if idx > 0 && idx % cols == 0 {
-                                                    ui.end_row();
-                                                }
+                                    use egui_extras::{TableBuilder, Column};
 
-                                                ui.vertical(|ui| {
-                                                    let button_response = if let Some(texture) =
-                                                        self.thumbnails.get(&image.id)
-                                                    {
-                                                        let img = egui::Image::new((
-                                                            texture.id(),
-                                                            Vec2::new(thumbnail_size, thumbnail_size),
-                                                        ))
-                                                        .sense(egui::Sense::click());
-                                                        ui.add(img)
-                                                    } else {
-                                                        let (rect, response) = ui.allocate_exact_size(
-                                                            Vec2::new(thumbnail_size, thumbnail_size),
-                                                            egui::Sense::click(),
-                                                        );
-                                                        ui.painter().rect_filled(
-                                                            rect,
-                                                            5.0,
-                                                            egui::Color32::from_gray(100),
-                                                        );
-                                                        ui.painter().text(
-                                                            rect.center(),
-                                                            egui::Align2::CENTER_CENTER,
-                                                            "Loading...",
-                                                            egui::FontId::proportional(16.0),
-                                                            egui::Color32::WHITE,
-                                                        );
-                                                        response
-                                                    };
+                                    TableBuilder::new(ui)
+                                        .striped(true)
+                                        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                                        .column(Column::exact(100.0))
+                                        .column(Column::remainder().at_least(150.0))
+                                        .column(Column::exact(120.0))
+                                        .column(Column::exact(100.0))
+                                        .column(Column::exact(150.0))
+                                        .header(30.0, |mut header| {
+                                            header.col(|ui| {
+                                                ui.strong("Thumbnail");
+                                            });
+                                            header.col(|ui| {
+                                                ui.strong("Name");
+                                            });
+                                            header.col(|ui| {
+                                                ui.strong("Date");
+                                            });
+                                            header.col(|ui| {
+                                                ui.strong("Size");
+                                            });
+                                            header.col(|ui| {
+                                                ui.strong("Tags");
+                                            });
+                                        })
+                                        .body(|mut body| {
+                                            for image in &images {
+                                                let image_id = image.id.clone();
+                                                let is_selected = self.selected_image.as_ref() == Some(&image_id);
 
-                                                    if button_response.clicked() {
-                                                        self.selected_image = Some(image.id.clone());
+                                                body.row(thumbnail_height, |mut row| {
+                                                    row.set_selected(is_selected);
+
+                                                    let mut clicked = false;
+
+                                                    row.col(|ui| {
+                                                        if let Some(texture) = self.thumbnails.get(&image.id) {
+                                                            let texture_size = texture.size_vec2();
+                                                            let aspect_ratio = texture_size.x / texture_size.y;
+                                                            let display_width = thumbnail_height * aspect_ratio;
+                                                            let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
+
+                                                            let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click()));
+                                                            if response.clicked() {
+                                                                clicked = true;
+                                                            }
+                                                        } else {
+                                                            ui.label("Loading...");
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        if ui.button(&image.name).clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        if ui.selectable_label(false, "—").clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        if ui.selectable_label(false, "—").clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        if ui.selectable_label(false, "—").clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    if clicked {
+                                                        self.selected_image = Some(image_id.clone());
                                                     }
-
-                                                    ui.label(
-                                                        egui::RichText::new(&image.name).size(14.0),
-                                                    );
                                                 });
                                             }
                                         });

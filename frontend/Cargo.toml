@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 common = { version = "0.1.0", path = "../common" }
 console_error_panic_hook = "0.1.7"
 eframe = "0.33.3"
+egui_extras = "0.33.3"
 ehttp = "0.6.0"
 gloo-timers = { version = "0.3.0", features = ["futures"] }
 image = "0.25.9"
