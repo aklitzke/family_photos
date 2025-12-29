@@ -1,0 +1,51 @@
+name: Sync Google Drive to Cloudflare R2
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone for Google Drive
+        run: |
+          mkdir -p ~/.config/rclone
+          cat << EOF > ~/.config/rclone/rclone.conf
+          [gdrive]
+          type = drive
+          scope = drive.readonly
+          token = ${{ secrets.GDRIVE_TOKEN }}
+
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.R2_ACCESS_KEY_ID }}
+          secret_access_key = ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          endpoint = ${{ secrets.R2_ENDPOINT }}
+          acl = private
+          EOF
+
+      - name: Sync from Google Drive to R2
+        run: |
+          rclone sync \
+            gdrive:${{ secrets.GDRIVE_FOLDER_PATH }} \
+            r2:${{ secrets.R2_BUCKET_NAME }}/${{ secrets.R2_DESTINATION_PATH }} \
+            --progress \
+            --log-level INFO \
+            --transfers 4 \
+            --checkers 8 \
+            --drive-chunk-size 64M
+
+      - name: Report sync results
+        if: always()
+        run: |
+          echo "Sync completed!"
+          rclone size r2:${{ secrets.R2_BUCKET_NAME }}/${{ secrets.R2_DESTINATION_PATH }}
