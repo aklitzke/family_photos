@@ -2,4 +2,5 @@
 /build
 /dist
 /.wrangler
+/node_modules
 worker-build.log

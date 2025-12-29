@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
+use common::{HealthResponse, ImageListResponse, ImageMetadata};
 use worker::*;
 
-// Hardcoded list of 5 images - UPDATE THESE TO MATCH YOUR R2 OBJECTS
 const IMAGES: &[(&str, &str, &str)] = &[
     ("1", "Family History/Pile 1/2025-12-23-21-51-0001.jpg", "Family Photo 1"),
     ("2", "Family History/Pile 1/2025-12-23-21-51-0002.jpg", "Family Photo 2"),
@@ -9,24 +8,6 @@ const IMAGES: &[(&str, &str, &str)] = &[
     ("4", "Family History/Pile 1/2025-12-23-21-51-0004.jpg", "Family Photo 4"),
     ("5", "Family History/Pile 1/2025-12-23-21-54-0001.jpg", "Family Photo 5"),
 ];
-
-#[derive(Serialize, Deserialize)]
-struct ImageMetadata {
-    id: String,
-    key: String,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct ImageListResponse {
-    images: Vec<ImageMetadata>,
-}
-
-#[derive(Serialize)]
-struct HealthResponse {
-    status: String,
-    message: String,
-}
 
 #[event(fetch)]
 async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {

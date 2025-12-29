@@ -1,6 +1,6 @@
+use common::{ImageListResponse, ImageMetadata};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
@@ -11,18 +11,6 @@ const API_BASE_URL: &str = if cfg!(debug_assertions) {
 } else {
     ""
 };
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct ImageMetadata {
-    id: String,
-    key: String,
-    name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ImageListResponse {
-    images: Vec<ImageMetadata>,
-}
 
 #[derive(Clone)]
 enum LoadState<T: Clone> {

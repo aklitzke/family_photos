@@ -7,6 +7,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+common = { version = "0.1.0", path = "../common" }
 console_error_panic_hook = "0.1.7"
 eframe = "0.33.3"
 ehttp = "0.6.0"
