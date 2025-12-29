@@ -6,7 +6,6 @@ use axum::{
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use std::net::SocketAddr;
-use std::path::Path;
 
 #[tokio::main]
 async fn main() {
@@ -14,7 +13,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Find the frontend dist directory - try multiple possible paths
-    let frontend_path = find_frontend_dist().expect("Could not find frontend/dist directory. Run 'npm run build' in the frontend directory.");
+    let frontend_path = "../frontend/dist";
 
     tracing::info!("Serving frontend from: {}", frontend_path);
 
@@ -32,24 +31,6 @@ async fn main() {
     tracing::info!("Server listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-fn find_frontend_dist() -> Option<String> {
-    // Possible paths to check, in order of preference
-    let paths = vec![
-        "../frontend/dist",      // Running from backend/
-        "frontend/dist",         // Running from project root
-        "./frontend/dist",       // Alternative project root
-        "../../frontend/dist",   // Running from backend/target/debug or similar
-    ];
-
-    for path in paths {
-        if Path::new(path).exists() {
-            return Some(path.to_string());
-        }
-    }
-
-    None
 }
 
 async fn health_check() -> Json<serde_json::Value> {
