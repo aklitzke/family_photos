@@ -3,15 +3,11 @@ use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let (bucket_name, files) = list_r2_bucket("google_drive_pics").await?;
-
-    println!("📦 Listing files in R2 bucket: {}", bucket_name);
+    let (_bucket_name, files) = list_r2_bucket("google_drive_pics").await?;
 
     for file in &files {
-        println!("  📄 {} ({} bytes)", file.key, file.size);
+        println!("{}", file.key);
     }
-
-    println!("\n✅ Total files: {}", files.len());
 
     Ok(())
 }
