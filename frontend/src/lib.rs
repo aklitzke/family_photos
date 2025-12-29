@@ -1,4 +1,4 @@
-use common::{ImageListResponse, ImageMetadata};
+use common::{HealthResponse, ImageListResponse, ImageMetadata};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -11,6 +11,12 @@ const API_BASE_URL: &str = if cfg!(debug_assertions) {
 } else {
     ""
 };
+
+#[derive(Clone, PartialEq)]
+enum Page {
+    Images,
+    Health,
+}
 
 #[derive(Clone)]
 enum LoadState<T: Clone> {
@@ -58,6 +64,7 @@ pub fn start() -> Result<(), JsValue> {
 }
 
 struct FamilyPhotosApp {
+    current_page: Page,
     images: LoadState<Vec<ImageMetadata>>,
     images_loading: Option<Arc<Mutex<LoadState<Vec<ImageMetadata>>>>>,
     thumbnails: HashMap<String, TextureHandle>,
@@ -65,11 +72,14 @@ struct FamilyPhotosApp {
     selected_image: Option<String>,
     full_image: Option<TextureHandle>,
     full_image_loading: Option<Arc<Mutex<LoadState<Vec<u8>>>>>,
+    health: LoadState<HealthResponse>,
+    health_loading: Option<Arc<Mutex<LoadState<HealthResponse>>>>,
 }
 
 impl FamilyPhotosApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
+            current_page: Page::Images,
             images: LoadState::NotStarted,
             images_loading: None,
             thumbnails: HashMap::new(),
@@ -77,6 +87,8 @@ impl FamilyPhotosApp {
             selected_image: None,
             full_image: None,
             full_image_loading: None,
+            health: LoadState::NotStarted,
+            health_loading: None,
         }
     }
 
@@ -229,6 +241,48 @@ impl FamilyPhotosApp {
             self.full_image_loading = None;
         }
     }
+
+    fn load_health(&mut self, ctx: &egui::Context) {
+        if self.health_loading.is_some() || !matches!(self.health, LoadState::NotStarted) {
+            return;
+        }
+
+        self.health = LoadState::Loading;
+        let health_state = Arc::new(Mutex::new(LoadState::<HealthResponse>::Loading));
+        self.health_loading = Some(health_state.clone());
+        let ctx_clone = ctx.clone();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            match fetch_json::<HealthResponse>("/api/health").await {
+                Ok(response) => {
+                    *health_state.lock().unwrap() = LoadState::Loaded(response);
+                    ctx_clone.request_repaint();
+                }
+                Err(e) => {
+                    *health_state.lock().unwrap() = LoadState::Failed(e);
+                    ctx_clone.request_repaint();
+                }
+            }
+        });
+    }
+
+    fn process_loaded_health(&mut self) {
+        let should_update = if let Some(loading_state) = &self.health_loading {
+            let state = loading_state.lock().unwrap();
+            match &*state {
+                LoadState::Loaded(data) => Some(LoadState::Loaded(data.clone())),
+                LoadState::Failed(err) => Some(LoadState::Failed(err.clone())),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        if let Some(new_state) = should_update {
+            self.health = new_state;
+            self.health_loading = None;
+        }
+    }
 }
 
 impl eframe::App for FamilyPhotosApp {
@@ -236,6 +290,24 @@ impl eframe::App for FamilyPhotosApp {
         self.process_loaded_images();
         self.process_loaded_thumbnails(ctx);
         self.process_loaded_full_image(ctx);
+        self.process_loaded_health();
+
+        egui::SidePanel::left("sidebar")
+            .resizable(false)
+            .default_width(150.0)
+            .show(ctx, |ui| {
+                ui.add_space(20.0);
+                ui.heading("Family Photos");
+                ui.add_space(20.0);
+
+                if ui.selectable_label(self.current_page == Page::Images, "Images").clicked() {
+                    self.current_page = Page::Images;
+                }
+
+                if ui.selectable_label(self.current_page == Page::Health, "Health").clicked() {
+                    self.current_page = Page::Health;
+                }
+            });
 
         // Show full image overlay if selected
         if let Some(selected_id) = self.selected_image.clone() {
@@ -299,101 +371,128 @@ impl eframe::App for FamilyPhotosApp {
                     });
                 });
         } else {
-            // Main gallery view
             egui::CentralPanel::default().show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(40.0);
+                match self.current_page {
+                    Page::Images => {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(40.0);
 
-                    ui.heading(egui::RichText::new("Family Photos").size(48.0).strong());
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new("Click a photo to view full size").size(16.0));
+                            ui.heading(egui::RichText::new("Family Photos").size(48.0).strong());
+                            ui.add_space(10.0);
+                            ui.label(egui::RichText::new("Click a photo to view full size").size(16.0));
 
-                    ui.add_space(30.0);
+                            ui.add_space(30.0);
 
-                    // Update images state
-                    if matches!(self.images, LoadState::NotStarted) {
-                        self.load_image_list(ctx);
-                    }
-
-                    match self.images.clone() {
-                        LoadState::Loading => {
-                            ui.label(egui::RichText::new("Loading images...").size(20.0));
-                        }
-                        LoadState::Failed(err) => {
-                            ui.colored_label(
-                                egui::Color32::RED,
-                                egui::RichText::new(format!("Error: {}", err)).size(16.0),
-                            );
-                        }
-                        LoadState::Loaded(images) => {
-                            // Display thumbnails in a grid
-                            let thumbnail_size = 250.0;
-                            let spacing = 20.0;
-                            let available_width = ui.available_width();
-                            let cols = ((available_width + spacing) / (thumbnail_size + spacing))
-                                .max(1.0) as usize;
-
-                            // Load all thumbnails
-                            for image in &images {
-                                self.load_thumbnail(&image.id, ctx);
+                            if matches!(self.images, LoadState::NotStarted) {
+                                self.load_image_list(ctx);
                             }
 
-                            egui::Grid::new("image_grid")
-                                .spacing([spacing, spacing])
-                                .show(ui, |ui| {
-                                    for (idx, image) in images.iter().enumerate() {
-                                        if idx > 0 && idx % cols == 0 {
-                                            ui.end_row();
-                                        }
+                            match self.images.clone() {
+                                LoadState::Loading => {
+                                    ui.label(egui::RichText::new("Loading images...").size(20.0));
+                                }
+                                LoadState::Failed(err) => {
+                                    ui.colored_label(
+                                        egui::Color32::RED,
+                                        egui::RichText::new(format!("Error: {}", err)).size(16.0),
+                                    );
+                                }
+                                LoadState::Loaded(images) => {
+                                    let thumbnail_size = 250.0;
+                                    let spacing = 20.0;
+                                    let available_width = ui.available_width();
+                                    let cols = ((available_width + spacing) / (thumbnail_size + spacing))
+                                        .max(1.0) as usize;
 
-                                        ui.vertical(|ui| {
-                                            // Display thumbnail or placeholder
-                                            let button_response = if let Some(texture) =
-                                                self.thumbnails.get(&image.id)
-                                            {
-                                                let img = egui::Image::new((
-                                                    texture.id(),
-                                                    Vec2::new(thumbnail_size, thumbnail_size),
-                                                ))
-                                                .sense(egui::Sense::click());
-                                                ui.add(img)
-                                            } else {
-                                                // Placeholder
-                                                let (rect, response) = ui.allocate_exact_size(
-                                                    Vec2::new(thumbnail_size, thumbnail_size),
-                                                    egui::Sense::click(),
-                                                );
-                                                ui.painter().rect_filled(
-                                                    rect,
-                                                    5.0,
-                                                    egui::Color32::from_gray(100),
-                                                );
-                                                ui.painter().text(
-                                                    rect.center(),
-                                                    egui::Align2::CENTER_CENTER,
-                                                    "Loading...",
-                                                    egui::FontId::proportional(16.0),
-                                                    egui::Color32::WHITE,
-                                                );
-                                                response
-                                            };
-
-                                            // Handle click
-                                            if button_response.clicked() {
-                                                self.selected_image = Some(image.id.clone());
-                                            }
-
-                                            // Image name
-                                            ui.label(
-                                                egui::RichText::new(&image.name).size(14.0),
-                                            );
-                                        });
+                                    for image in &images {
+                                        self.load_thumbnail(&image.id, ctx);
                                     }
-                                });
-                        }
-                        LoadState::NotStarted => {}
+
+                                    egui::Grid::new("image_grid")
+                                        .spacing([spacing, spacing])
+                                        .show(ui, |ui| {
+                                            for (idx, image) in images.iter().enumerate() {
+                                                if idx > 0 && idx % cols == 0 {
+                                                    ui.end_row();
+                                                }
+
+                                                ui.vertical(|ui| {
+                                                    let button_response = if let Some(texture) =
+                                                        self.thumbnails.get(&image.id)
+                                                    {
+                                                        let img = egui::Image::new((
+                                                            texture.id(),
+                                                            Vec2::new(thumbnail_size, thumbnail_size),
+                                                        ))
+                                                        .sense(egui::Sense::click());
+                                                        ui.add(img)
+                                                    } else {
+                                                        let (rect, response) = ui.allocate_exact_size(
+                                                            Vec2::new(thumbnail_size, thumbnail_size),
+                                                            egui::Sense::click(),
+                                                        );
+                                                        ui.painter().rect_filled(
+                                                            rect,
+                                                            5.0,
+                                                            egui::Color32::from_gray(100),
+                                                        );
+                                                        ui.painter().text(
+                                                            rect.center(),
+                                                            egui::Align2::CENTER_CENTER,
+                                                            "Loading...",
+                                                            egui::FontId::proportional(16.0),
+                                                            egui::Color32::WHITE,
+                                                        );
+                                                        response
+                                                    };
+
+                                                    if button_response.clicked() {
+                                                        self.selected_image = Some(image.id.clone());
+                                                    }
+
+                                                    ui.label(
+                                                        egui::RichText::new(&image.name).size(14.0),
+                                                    );
+                                                });
+                                            }
+                                        });
+                                }
+                                LoadState::NotStarted => {}
+                            }
+                        });
                     }
-                });
+                    Page::Health => {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(40.0);
+
+                            ui.heading(egui::RichText::new("Health Check").size(48.0).strong());
+
+                            ui.add_space(30.0);
+
+                            if matches!(self.health, LoadState::NotStarted) {
+                                self.load_health(ctx);
+                            }
+
+                            match self.health.clone() {
+                                LoadState::Loading => {
+                                    ui.label(egui::RichText::new("Loading...").size(20.0));
+                                }
+                                LoadState::Failed(err) => {
+                                    ui.colored_label(
+                                        egui::Color32::RED,
+                                        egui::RichText::new(format!("Error: {}", err)).size(16.0),
+                                    );
+                                }
+                                LoadState::Loaded(health) => {
+                                    ui.label(egui::RichText::new(format!("Status: {}", health.status)).size(24.0));
+                                    ui.add_space(10.0);
+                                    ui.label(egui::RichText::new(format!("Message: {}", health.message)).size(18.0));
+                                }
+                                LoadState::NotStarted => {}
+                            }
+                        });
+                    }
+                }
             });
         }
     }

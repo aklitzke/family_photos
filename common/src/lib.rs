@@ -12,7 +12,7 @@ pub struct ImageListResponse {
     pub images: Vec<ImageMetadata>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct HealthResponse {
     pub status: String,
     pub message: String,
