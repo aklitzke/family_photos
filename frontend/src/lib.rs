@@ -12,6 +12,11 @@ const API_BASE_URL: &str = if cfg!(debug_assertions) {
     ""
 };
 
+// UI Constants
+const ZOOM_MIN: f32 = 0.1;
+const ZOOM_MAX: f32 = 50.0;
+const ZOOM_DEFAULT: f32 = 1.0;
+
 #[derive(Clone, PartialEq)]
 enum Page {
     Images,
@@ -24,6 +29,121 @@ enum LoadState<T: Clone> {
     Loading,
     Loaded(T),
     Failed(String),
+}
+
+// Generic async resource wrapper to eliminate duplicated loading pattern
+struct AsyncResource<T: Clone> {
+    state: LoadState<T>,
+    loading: Option<Arc<Mutex<LoadState<T>>>>,
+}
+
+impl<T: Clone> AsyncResource<T> {
+    fn new() -> Self {
+        Self {
+            state: LoadState::NotStarted,
+            loading: None,
+        }
+    }
+
+    fn is_loading(&self) -> bool {
+        self.loading.is_some()
+    }
+
+    fn is_not_started(&self) -> bool {
+        matches!(self.state, LoadState::NotStarted)
+    }
+
+    fn start_loading(&mut self) -> Arc<Mutex<LoadState<T>>> {
+        self.state = LoadState::Loading;
+        let loading_state = Arc::new(Mutex::new(LoadState::<T>::Loading));
+        self.loading = Some(loading_state.clone());
+        loading_state
+    }
+
+    fn process(&mut self) {
+        let should_update = if let Some(loading_state) = &self.loading {
+            let state = loading_state.lock().unwrap();
+            match &*state {
+                LoadState::Loaded(data) => Some(LoadState::Loaded(data.clone())),
+                LoadState::Failed(err) => Some(LoadState::Failed(err.clone())),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        if let Some(new_state) = should_update {
+            self.state = new_state;
+            self.loading = None;
+        }
+    }
+
+    fn get(&self) -> &LoadState<T> {
+        &self.state
+    }
+}
+
+// Zoom controller for image viewing
+struct ZoomController {
+    zoom: f32,
+    scroll_offset: Vec2,
+}
+
+impl ZoomController {
+    fn new() -> Self {
+        Self {
+            zoom: ZOOM_DEFAULT,
+            scroll_offset: Vec2::ZERO,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.zoom = ZOOM_DEFAULT;
+        self.scroll_offset = Vec2::ZERO;
+    }
+
+    fn apply_zoom_delta(&mut self, delta: f32) {
+        self.zoom = (self.zoom * delta).clamp(ZOOM_MIN, ZOOM_MAX);
+    }
+
+    /// Calculate new scroll offset to zoom towards a specific point
+    fn calculate_zoom_to_cursor(
+        &self,
+        old_zoom: f32,
+        new_zoom: f32,
+        mouse_in_viewport: Vec2,
+        texture_size: Vec2,
+        base_scale: f32,
+        available_size: Vec2,
+    ) -> Vec2 {
+        // Calculate old padding and display size
+        let old_display_size = texture_size * (base_scale * old_zoom);
+        let old_x_padding = ((available_size.x - old_display_size.x) / 2.0).max(0.0);
+        let old_y_padding = ((available_size.y - old_display_size.y) / 2.0).max(0.0);
+
+        // New padding and display size
+        let new_display_size = texture_size * (base_scale * new_zoom);
+        let new_x_padding = ((available_size.x - new_display_size.x) / 2.0).max(0.0);
+        let new_y_padding = ((available_size.y - new_display_size.y) / 2.0).max(0.0);
+
+        // Position in old image (accounting for scroll and padding)
+        let point_in_old_image_x = self.scroll_offset.x + mouse_in_viewport.x - old_x_padding;
+        let point_in_old_image_y = self.scroll_offset.y + mouse_in_viewport.y - old_y_padding;
+
+        // Normalized position (0-1) in the actual image
+        let norm_x = (point_in_old_image_x / old_display_size.x).clamp(0.0, 1.0);
+        let norm_y = (point_in_old_image_y / old_display_size.y).clamp(0.0, 1.0);
+
+        // Where that point is in the new zoomed image
+        let point_in_new_image_x = norm_x * new_display_size.x;
+        let point_in_new_image_y = norm_y * new_display_size.y;
+
+        // Calculate new scroll offset to keep that point under mouse
+        let new_offset_x = (point_in_new_image_x + new_x_padding - mouse_in_viewport.x).max(0.0);
+        let new_offset_y = (point_in_new_image_y + new_y_padding - mouse_in_viewport.y).max(0.0);
+
+        egui::vec2(new_offset_x, new_offset_y)
+    }
 }
 
 #[wasm_bindgen]
@@ -65,45 +185,37 @@ pub fn start() -> Result<(), JsValue> {
 
 struct FamilyPhotosApp {
     current_page: Page,
-    images: LoadState<Vec<ImageMetadata>>,
-    images_loading: Option<Arc<Mutex<LoadState<Vec<ImageMetadata>>>>>,
+    images: AsyncResource<Vec<ImageMetadata>>,
     thumbnails: HashMap<String, TextureHandle>,
     thumbnail_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     selected_image: Option<String>,
     full_images: HashMap<String, TextureHandle>,
     full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
-    full_image_zoom: f32,
-    full_image_scroll_offset: Vec2,
-    health: LoadState<HealthResponse>,
-    health_loading: Option<Arc<Mutex<LoadState<HealthResponse>>>>,
+    zoom_controller: ZoomController,
+    health: AsyncResource<HealthResponse>,
 }
 
 impl FamilyPhotosApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             current_page: Page::Images,
-            images: LoadState::NotStarted,
-            images_loading: None,
+            images: AsyncResource::new(),
             thumbnails: HashMap::new(),
             thumbnail_loading: HashMap::new(),
             selected_image: None,
             full_images: HashMap::new(),
             full_images_loading: HashMap::new(),
-            full_image_zoom: 1.0,
-            full_image_scroll_offset: Vec2::ZERO,
-            health: LoadState::NotStarted,
-            health_loading: None,
+            zoom_controller: ZoomController::new(),
+            health: AsyncResource::new(),
         }
     }
 
     fn load_image_list(&mut self, ctx: &egui::Context) {
-        if self.images_loading.is_some() || !matches!(self.images, LoadState::NotStarted) {
+        if self.images.is_loading() || !self.images.is_not_started() {
             return;
         }
 
-        self.images = LoadState::Loading;
-        let images_state = Arc::new(Mutex::new(LoadState::<Vec<ImageMetadata>>::Loading));
-        self.images_loading = Some(images_state.clone());
+        let images_state = self.images.start_loading();
         let ctx_clone = ctx.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
@@ -118,24 +230,6 @@ impl FamilyPhotosApp {
                 }
             }
         });
-    }
-
-    fn process_loaded_images(&mut self) {
-        let should_update = if let Some(loading_state) = &self.images_loading {
-            let state = loading_state.lock().unwrap();
-            match &*state {
-                LoadState::Loaded(data) => Some(LoadState::Loaded(data.clone())),
-                LoadState::Failed(err) => Some(LoadState::Failed(err.clone())),
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        if let Some(new_state) = should_update {
-            self.images = new_state;
-            self.images_loading = None;
-        }
     }
 
     fn load_thumbnail(&mut self, id: &str, ctx: &egui::Context) {
@@ -247,13 +341,11 @@ impl FamilyPhotosApp {
     }
 
     fn load_health(&mut self, ctx: &egui::Context) {
-        if self.health_loading.is_some() || !matches!(self.health, LoadState::NotStarted) {
+        if self.health.is_loading() || !self.health.is_not_started() {
             return;
         }
 
-        self.health = LoadState::Loading;
-        let health_state = Arc::new(Mutex::new(LoadState::<HealthResponse>::Loading));
-        self.health_loading = Some(health_state.clone());
+        let health_state = self.health.start_loading();
         let ctx_clone = ctx.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
@@ -270,32 +362,12 @@ impl FamilyPhotosApp {
         });
     }
 
-    fn process_loaded_health(&mut self) {
-        let should_update = if let Some(loading_state) = &self.health_loading {
-            let state = loading_state.lock().unwrap();
-            match &*state {
-                LoadState::Loaded(data) => Some(LoadState::Loaded(data.clone())),
-                LoadState::Failed(err) => Some(LoadState::Failed(err.clone())),
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        if let Some(new_state) = should_update {
-            self.health = new_state;
-            self.health_loading = None;
-        }
+    fn close_image_view(&mut self) {
+        self.selected_image = None;
+        self.zoom_controller.reset();
     }
-}
 
-impl eframe::App for FamilyPhotosApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.process_loaded_images();
-        self.process_loaded_thumbnails(ctx);
-        self.process_loaded_full_images(ctx);
-        self.process_loaded_health();
-
+    fn render_sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("sidebar")
             .resizable(false)
             .default_width(150.0)
@@ -312,6 +384,17 @@ impl eframe::App for FamilyPhotosApp {
                     self.current_page = Page::Health;
                 }
             });
+    }
+}
+
+impl eframe::App for FamilyPhotosApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.images.process();
+        self.process_loaded_thumbnails(ctx);
+        self.process_loaded_full_images(ctx);
+        self.health.process();
+
+        self.render_sidebar(ctx);
 
         // Show full image overlay if selected
         if let Some(selected_id) = self.selected_image.clone() {
@@ -331,7 +414,7 @@ impl eframe::App for FamilyPhotosApp {
                     let bg_response = ui.interact(screen_rect, egui::Id::new("overlay_bg"), egui::Sense::click());
 
                     // Track old zoom for zoom-to-cursor
-                    let old_zoom = self.full_image_zoom;
+                    let old_zoom = self.zoom_controller.zoom;
 
                     // Right panel for controls and metadata
                     egui::SidePanel::right("image_controls")
@@ -342,9 +425,7 @@ impl eframe::App for FamilyPhotosApp {
 
                             // Close button
                             if ui.button(egui::RichText::new("✕ Close").size(18.0)).clicked() {
-                                self.selected_image = None;
-                                self.full_image_zoom = 1.0;
-                                self.full_image_scroll_offset = Vec2::ZERO;
+                                self.close_image_view();
                             }
 
                             ui.add_space(20.0);
@@ -353,23 +434,22 @@ impl eframe::App for FamilyPhotosApp {
 
                             // Zoom controls
                             ui.heading("Zoom");
-                            ui.label(format!("{:.0}%", self.full_image_zoom * 100.0));
+                            ui.label(format!("{:.0}%", self.zoom_controller.zoom * 100.0));
 
                             // Handle pinch-to-zoom (trackpad gesture)
                             let zoom_delta = ui.input(|i| i.zoom_delta());
                             if zoom_delta != 1.0 {
-                                self.full_image_zoom = (self.full_image_zoom * zoom_delta).clamp(0.1, 50.0);
+                                self.zoom_controller.apply_zoom_delta(zoom_delta);
                             }
 
                             // Zoom slider
-                            if ui.add(egui::Slider::new(&mut self.full_image_zoom, 0.1..=50.0)
+                            ui.add(egui::Slider::new(&mut self.zoom_controller.zoom, ZOOM_MIN..=ZOOM_MAX)
                                 .text("")
-                                .logarithmic(true)).changed() {
-                            }
+                                .logarithmic(true));
 
                             // Reset zoom button
                             if ui.button("Reset Zoom (100%)").clicked() {
-                                self.full_image_zoom = 1.0;
+                                self.zoom_controller.reset();
                             }
 
                             ui.add_space(20.0);
@@ -395,67 +475,32 @@ impl eframe::App for FamilyPhotosApp {
                                     .min(1.0);
 
                                 // Apply zoom
-                                let scale = base_scale * self.full_image_zoom;
+                                let scale = base_scale * self.zoom_controller.zoom;
                                 let display_size = texture_size * scale;
 
                                 // Calculate zoom change for scroll adjustment
-                                let zoom_changed = old_zoom != self.full_image_zoom;
+                                let zoom_changed = old_zoom != self.zoom_controller.zoom;
 
                                 // Use ScrollArea for panning with scroll
                                 let scroll_id = egui::Id::new("image_scroll");
 
                                 // Calculate new scroll offset if zoom changed (before showing ScrollArea)
-                                let mut new_scroll_offset = self.full_image_scroll_offset;
+                                let mut new_scroll_offset = self.zoom_controller.scroll_offset;
                                 if zoom_changed {
-                                    web_sys::console::log_1(&format!("=== ZOOM CHANGE ===").into());
-                                    web_sys::console::log_1(&format!("Old zoom: {:.2}, New zoom: {:.2}", old_zoom, self.full_image_zoom).into());
-                                    web_sys::console::log_1(&format!("Old scroll offset: {:?}", self.full_image_scroll_offset).into());
-
                                     if let Some(pointer_pos) = ctx.pointer_hover_pos() {
-                                        web_sys::console::log_1(&format!("Mouse position: {:?}", pointer_pos).into());
-
-                                        // We need to estimate the viewport rect
-                                        // Use the available space in the central panel
+                                        // Calculate mouse position in viewport
                                         let viewport_pos = ui.min_rect().min;
                                         let mouse_in_viewport = pointer_pos - viewport_pos;
 
-                                        web_sys::console::log_1(&format!("Mouse in viewport: {:?}", mouse_in_viewport).into());
-
-                                        // Calculate old padding and display size
-                                        let old_display_size = texture_size * (base_scale * old_zoom);
-                                        let old_x_padding = ((available_size.x - old_display_size.x) / 2.0).max(0.0);
-                                        let old_y_padding = ((available_size.y - old_display_size.y) / 2.0).max(0.0);
-
-                                        // New padding
-                                        let new_x_padding = ((available_size.x - display_size.x) / 2.0).max(0.0);
-                                        let new_y_padding = ((available_size.y - display_size.y) / 2.0).max(0.0);
-
-                                        web_sys::console::log_1(&format!("Old padding: ({:.2}, {:.2})", old_x_padding, old_y_padding).into());
-                                        web_sys::console::log_1(&format!("New padding: ({:.2}, {:.2})", new_x_padding, new_y_padding).into());
-                                        web_sys::console::log_1(&format!("Old display size: {:?}", old_display_size).into());
-                                        web_sys::console::log_1(&format!("New display size: {:?}", display_size).into());
-
-                                        // Position in old image (accounting for scroll and padding)
-                                        let point_in_old_image_x = self.full_image_scroll_offset.x + mouse_in_viewport.x - old_x_padding;
-                                        let point_in_old_image_y = self.full_image_scroll_offset.y + mouse_in_viewport.y - old_y_padding;
-
-                                        // Normalized position (0-1) in the actual image
-                                        let norm_x = (point_in_old_image_x / old_display_size.x).clamp(0.0, 1.0);
-                                        let norm_y = (point_in_old_image_y / old_display_size.y).clamp(0.0, 1.0);
-
-                                        web_sys::console::log_1(&format!("Normalized point: ({:.3}, {:.3})", norm_x, norm_y).into());
-
-                                        // Where that point is in the new zoomed image
-                                        let point_in_new_image_x = norm_x * display_size.x;
-                                        let point_in_new_image_y = norm_y * display_size.y;
-
-                                        // Calculate new scroll offset to keep that point under mouse
-                                        let new_offset_x = (point_in_new_image_x + new_x_padding - mouse_in_viewport.x).max(0.0);
-                                        let new_offset_y = (point_in_new_image_y + new_y_padding - mouse_in_viewport.y).max(0.0);
-
-                                        web_sys::console::log_1(&format!("New offset: [{:.2} {:.2}]", new_offset_x, new_offset_y).into());
-
-                                        new_scroll_offset = egui::vec2(new_offset_x, new_offset_y);
+                                        // Use zoom controller to calculate new offset
+                                        new_scroll_offset = self.zoom_controller.calculate_zoom_to_cursor(
+                                            old_zoom,
+                                            self.zoom_controller.zoom,
+                                            mouse_in_viewport,
+                                            texture_size,
+                                            base_scale,
+                                            available_size,
+                                        );
                                     }
                                 }
 
@@ -477,7 +522,7 @@ impl eframe::App for FamilyPhotosApp {
                                     });
 
                                 // Update our tracked scroll offset from the actual state
-                                self.full_image_scroll_offset = scroll_output.state.offset;
+                                self.zoom_controller.scroll_offset = scroll_output.state.offset;
                             } else {
                                 ui.centered_and_justified(|ui| {
                                     self.load_full_image(&selected_id, ctx);
@@ -487,9 +532,7 @@ impl eframe::App for FamilyPhotosApp {
                         });
 
                     if bg_response.clicked() {
-                        self.selected_image = None;
-                        self.full_image_zoom = 1.0;
-                        self.full_image_scroll_offset = Vec2::ZERO;
+                        self.close_image_view();
                     }
                 });
         } else {
@@ -505,11 +548,11 @@ impl eframe::App for FamilyPhotosApp {
 
                             ui.add_space(30.0);
 
-                            if matches!(self.images, LoadState::NotStarted) {
+                            if matches!(self.images.get(), LoadState::NotStarted) {
                                 self.load_image_list(ctx);
                             }
 
-                            match self.images.clone() {
+                            match self.images.get().clone() {
                                 LoadState::Loading => {
                                     ui.label(egui::RichText::new("Loading images...").size(20.0));
                                 }
@@ -642,11 +685,11 @@ impl eframe::App for FamilyPhotosApp {
 
                             ui.add_space(30.0);
 
-                            if matches!(self.health, LoadState::NotStarted) {
+                            if matches!(self.health.get(), LoadState::NotStarted) {
                                 self.load_health(ctx);
                             }
 
-                            match self.health.clone() {
+                            match self.health.get().clone() {
                                 LoadState::Loading => {
                                     ui.label(egui::RichText::new("Loading...").size(20.0));
                                 }
