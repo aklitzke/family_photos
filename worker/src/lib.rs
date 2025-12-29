@@ -1,16 +1,11 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
-use common::{HealthResponse, ImageListResponse, ImageMetadata};
+use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata};
 use serde::Deserialize;
 use worker::*;
 
 const GITHUB_API_URL: &str =
     "https://api.github.com/repos/aklitzke/family_photos/contents/data/history.toml";
 const MAX_RETRIES: u32 = 3;
-
-#[derive(Deserialize)]
-struct HistoryData {
-    images: Vec<ImageMetadata>,
-}
 
 #[derive(Deserialize)]
 struct GitHubContentsResponse {

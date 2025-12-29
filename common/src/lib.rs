@@ -17,3 +17,8 @@ pub struct HealthResponse {
     pub status: String,
     pub message: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct HistoryData {
+    pub images: Vec<ImageMetadata>,
+}

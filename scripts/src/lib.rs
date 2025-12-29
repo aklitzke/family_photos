@@ -1,6 +1,7 @@
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::config::{Credentials, Region};
 use aws_sdk_s3::Client;
+use common::HistoryData;
 use serde::Deserialize;
 use std::env;
 use std::error::Error;
@@ -97,4 +98,16 @@ pub async fn list_r2_bucket(bucket_binding: &str) -> Result<(String, Vec<R2File>
     }
 
     Ok((bucket_name, files))
+}
+
+pub fn read_history() -> Result<HistoryData, Box<dyn Error>> {
+    let content = fs::read_to_string("../data/history.toml")?;
+    let data: HistoryData = toml::from_str(&content)?;
+    Ok(data)
+}
+
+pub fn write_history(data: &HistoryData) -> Result<(), Box<dyn Error>> {
+    let toml_string = toml::to_string_pretty(data)?;
+    fs::write("../data/history.toml", toml_string)?;
+    Ok(())
 }
