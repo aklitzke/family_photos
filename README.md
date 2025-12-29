@@ -1,45 +1,5 @@
 # Family Photos
 
-A modern web application for storing and organizing family photos, built with a full Rust stack: Axum backend and egui frontend compiled to WebAssembly.
-
-## Tech Stack
-
-- **Backend**: Rust with Axum web framework
-- **Frontend**: Rust with egui (compiled to WASM)
-- **Architecture**: Full Rust stack with canvas-based rendering
-
-## Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- [Rust](https://rustup.rs/) (latest stable version - 1.88+)
-- [Trunk](https://trunkrs.dev/) - WASM web application bundler
-  ```bash
-  cargo install trunk
-  ```
-- WASM target for Rust:
-  ```bash
-  rustup target add wasm32-unknown-unknown
-  ```
-
-## Project Structure
-
-```
-family_photos/
-├── backend/              # Rust/Axum server
-│   ├── src/
-│   │   └── main.rs      # Server implementation
-│   └── Cargo.toml       # Backend dependencies
-├── frontend/            # egui + WASM frontend
-│   ├── src/
-│   │   └── lib.rs       # egui app implementation
-│   ├── Cargo.toml       # Frontend dependencies
-│   ├── Trunk.toml       # Trunk build configuration
-│   ├── index.html       # HTML shell
-│   └── dist/            # Built WASM output (generated)
-└── README.md
-```
-
 ## Getting Started
 
 ### 1. Build the Frontend
@@ -109,15 +69,6 @@ For the best development experience:
 - `GET /api/health` - Health check endpoint
   - Returns: `{"status": "ok", "message": "Server is running"}`
 
-## Features
-
-- **Canvas-Based Rendering**: egui renders directly to HTML5 canvas, similar to Flutter
-- **Full Rust Stack**: Type safety from frontend to backend
-- **Immediate Mode GUI**: Simple, reactive UI programming model
-- **WASM**: Fast, secure frontend with near-native performance
-- **Single Server**: Backend serves both API and frontend
-- **Cross-Platform**: Can compile to desktop/mobile later
-
 ## Building for Production
 
 1. Build the frontend:
@@ -138,24 +89,6 @@ For the best development experience:
    ```
 
 4. Deploy the binary - everything is self-contained!
-
-## UI Features
-
-The landing page includes:
-- Large title and description
-- Interactive buttons (Get Started, Learn More, Check Health)
-- Feature showcase with icons
-- Health check API integration example
-- Clean, centered layout
-- Responsive design
-
-## Why egui?
-
-- **Flutter-like**: Canvas-based rendering instead of HTML/CSS
-- **Immediate Mode**: Simple mental model, easy to reason about
-- **Performance**: Compiled to WASM, runs at near-native speed
-- **Full Rust**: Share code between frontend and backend
-- **Portable**: Same code can run on web, desktop, and mobile
 
 ## Troubleshooting
 
