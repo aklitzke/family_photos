@@ -72,6 +72,7 @@ struct FamilyPhotosApp {
     selected_image: Option<String>,
     full_images: HashMap<String, TextureHandle>,
     full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
+    full_image_zoom: f32,
     health: LoadState<HealthResponse>,
     health_loading: Option<Arc<Mutex<LoadState<HealthResponse>>>>,
 }
@@ -87,6 +88,7 @@ impl FamilyPhotosApp {
             selected_image: None,
             full_images: HashMap::new(),
             full_images_loading: HashMap::new(),
+            full_image_zoom: 1.0,
             health: LoadState::NotStarted,
             health_loading: None,
         }
@@ -326,37 +328,89 @@ impl eframe::App for FamilyPhotosApp {
                     // Detect click on background to close (but don't consume the click)
                     let bg_response = ui.interact(screen_rect, egui::Id::new("overlay_bg"), egui::Sense::click());
 
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(50.0);
+                    // Right panel for controls and metadata
+                    egui::SidePanel::right("image_controls")
+                        .default_width(250.0)
+                        .resizable(true)
+                        .show_inside(ui, |ui| {
+                            ui.add_space(10.0);
 
-                        // Close button
-                        if ui.button(egui::RichText::new("✕ Close").size(20.0)).clicked() {
-                            self.selected_image = None;
-                        }
+                            // Close button
+                            if ui.button(egui::RichText::new("✕ Close").size(18.0)).clicked() {
+                                self.selected_image = None;
+                                self.full_image_zoom = 1.0;
+                            }
 
-                        ui.add_space(20.0);
+                            ui.add_space(20.0);
+                            ui.separator();
+                            ui.add_space(10.0);
 
-                        // Show full image or loading message
-                        if let Some(texture) = self.full_images.get(&selected_id) {
-                            let available_size = ui.available_size();
-                            let max_width = available_size.x * 0.9;
-                            let max_height = available_size.y * 0.8;
+                            // Zoom controls
+                            ui.heading("Zoom");
+                            ui.label(format!("{:.0}%", self.full_image_zoom * 100.0));
 
-                            let texture_size = texture.size_vec2();
-                            let scale = (max_width / texture_size.x)
-                                .min(max_height / texture_size.y)
-                                .min(1.0);
+                            // Handle pinch-to-zoom (trackpad gesture)
+                            let zoom_delta = ui.input(|i| i.zoom_delta());
+                            if zoom_delta != 1.0 {
+                                self.full_image_zoom = (self.full_image_zoom * zoom_delta).clamp(0.5, 5.0);
+                            }
 
-                            let display_size = texture_size * scale;
-                            ui.image((texture.id(), display_size));
-                        } else {
-                            self.load_full_image(&selected_id, ctx);
-                            ui.label(egui::RichText::new("Loading...").size(24.0));
-                        }
-                    });
+                            // Zoom slider
+                            if ui.add(egui::Slider::new(&mut self.full_image_zoom, 0.5..=5.0)
+                                .text("")
+                                .logarithmic(true)).changed() {
+                            }
+
+                            // Reset zoom button
+                            if ui.button("Reset Zoom (100%)").clicked() {
+                                self.full_image_zoom = 1.0;
+                            }
+
+                            ui.add_space(20.0);
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            // Placeholder for EXIF data
+                            ui.heading("Image Info");
+                            ui.label("EXIF data will appear here");
+                        });
+
+                    // Main image area
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::NONE)
+                        .show_inside(ui, |ui| {
+                            // Show full image or loading message
+                            if let Some(texture) = self.full_images.get(&selected_id) {
+                                let available_size = ui.available_size();
+
+                                let texture_size = texture.size_vec2();
+                                let base_scale = (available_size.x / texture_size.x)
+                                    .min(available_size.y / texture_size.y)
+                                    .min(1.0);
+
+                                // Apply zoom
+                                let scale = base_scale * self.full_image_zoom;
+                                let display_size = texture_size * scale;
+
+                                // Use ScrollArea for panning with scroll
+                                egui::ScrollArea::both()
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| {
+                                        ui.centered_and_justified(|ui| {
+                                            ui.image((texture.id(), display_size));
+                                        });
+                                    });
+                            } else {
+                                ui.centered_and_justified(|ui| {
+                                    self.load_full_image(&selected_id, ctx);
+                                    ui.label(egui::RichText::new("Loading...").size(24.0));
+                                });
+                            }
+                        });
 
                     if bg_response.clicked() {
                         self.selected_image = None;
+                        self.full_image_zoom = 1.0;
                     }
                 });
         } else {
@@ -437,9 +491,29 @@ impl eframe::App for FamilyPhotosApp {
                                                             let display_width = thumbnail_height * aspect_ratio;
                                                             let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
 
-                                                            let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click()));
+                                                            let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
+
                                                             if response.clicked() {
                                                                 clicked = true;
+                                                            }
+
+                                                            if response.hovered() {
+                                                                let enlarged_height = 300.0;
+                                                                let enlarged_width = enlarged_height * aspect_ratio;
+                                                                let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
+
+                                                                let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
+                                                                let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
+
+                                                                egui::Area::new(egui::Id::new(format!("hover_preview_{}", image.id)))
+                                                                    .fixed_pos(popup_pos)
+                                                                    .order(egui::Order::Tooltip)
+                                                                    .show(ui.ctx(), |ui| {
+                                                                        egui::Frame::popup(ui.style())
+                                                                            .show(ui, |ui| {
+                                                                                ui.image((texture.id(), enlarged_size));
+                                                                            });
+                                                                    });
                                                             }
                                                         } else {
                                                             ui.label("Loading...");
