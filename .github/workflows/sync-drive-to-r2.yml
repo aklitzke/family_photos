@@ -21,7 +21,9 @@ jobs:
           cat << EOF > ~/.config/rclone/rclone.conf
           [gdrive]
           type = drive
-          scope = drive.readonly
+          client_id = ${{ vars.GDRIVE_CLIENT_ID }}
+          client_secret = ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          scope = drive.readonly,drive.metadata.readonly
           token = ${{ secrets.GDRIVE_TOKEN }}
 
           [r2]

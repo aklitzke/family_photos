@@ -46,7 +46,7 @@ jobs:
 
       - name: Create _redirects for API proxy
         env:
-          WORKER_URL: ${{ secrets.WORKER_URL }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
         run: |
           echo "/api/* ${WORKER_URL}/api/:splat 200" > frontend/dist/_redirects
 
