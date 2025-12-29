@@ -73,6 +73,7 @@ struct FamilyPhotosApp {
     full_images: HashMap<String, TextureHandle>,
     full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     full_image_zoom: f32,
+    full_image_scroll_offset: Vec2,
     health: LoadState<HealthResponse>,
     health_loading: Option<Arc<Mutex<LoadState<HealthResponse>>>>,
 }
@@ -89,6 +90,7 @@ impl FamilyPhotosApp {
             full_images: HashMap::new(),
             full_images_loading: HashMap::new(),
             full_image_zoom: 1.0,
+            full_image_scroll_offset: Vec2::ZERO,
             health: LoadState::NotStarted,
             health_loading: None,
         }
@@ -328,6 +330,9 @@ impl eframe::App for FamilyPhotosApp {
                     // Detect click on background to close (but don't consume the click)
                     let bg_response = ui.interact(screen_rect, egui::Id::new("overlay_bg"), egui::Sense::click());
 
+                    // Track old zoom for zoom-to-cursor
+                    let old_zoom = self.full_image_zoom;
+
                     // Right panel for controls and metadata
                     egui::SidePanel::right("image_controls")
                         .default_width(250.0)
@@ -339,6 +344,7 @@ impl eframe::App for FamilyPhotosApp {
                             if ui.button(egui::RichText::new("✕ Close").size(18.0)).clicked() {
                                 self.selected_image = None;
                                 self.full_image_zoom = 1.0;
+                                self.full_image_scroll_offset = Vec2::ZERO;
                             }
 
                             ui.add_space(20.0);
@@ -392,14 +398,86 @@ impl eframe::App for FamilyPhotosApp {
                                 let scale = base_scale * self.full_image_zoom;
                                 let display_size = texture_size * scale;
 
+                                // Calculate zoom change for scroll adjustment
+                                let zoom_changed = old_zoom != self.full_image_zoom;
+
                                 // Use ScrollArea for panning with scroll
-                                egui::ScrollArea::both()
+                                let scroll_id = egui::Id::new("image_scroll");
+
+                                // Calculate new scroll offset if zoom changed (before showing ScrollArea)
+                                let mut new_scroll_offset = self.full_image_scroll_offset;
+                                if zoom_changed {
+                                    web_sys::console::log_1(&format!("=== ZOOM CHANGE ===").into());
+                                    web_sys::console::log_1(&format!("Old zoom: {:.2}, New zoom: {:.2}", old_zoom, self.full_image_zoom).into());
+                                    web_sys::console::log_1(&format!("Old scroll offset: {:?}", self.full_image_scroll_offset).into());
+
+                                    if let Some(pointer_pos) = ctx.pointer_hover_pos() {
+                                        web_sys::console::log_1(&format!("Mouse position: {:?}", pointer_pos).into());
+
+                                        // We need to estimate the viewport rect
+                                        // Use the available space in the central panel
+                                        let viewport_pos = ui.min_rect().min;
+                                        let mouse_in_viewport = pointer_pos - viewport_pos;
+
+                                        web_sys::console::log_1(&format!("Mouse in viewport: {:?}", mouse_in_viewport).into());
+
+                                        // Calculate old padding and display size
+                                        let old_display_size = texture_size * (base_scale * old_zoom);
+                                        let old_x_padding = ((available_size.x - old_display_size.x) / 2.0).max(0.0);
+                                        let old_y_padding = ((available_size.y - old_display_size.y) / 2.0).max(0.0);
+
+                                        // New padding
+                                        let new_x_padding = ((available_size.x - display_size.x) / 2.0).max(0.0);
+                                        let new_y_padding = ((available_size.y - display_size.y) / 2.0).max(0.0);
+
+                                        web_sys::console::log_1(&format!("Old padding: ({:.2}, {:.2})", old_x_padding, old_y_padding).into());
+                                        web_sys::console::log_1(&format!("New padding: ({:.2}, {:.2})", new_x_padding, new_y_padding).into());
+                                        web_sys::console::log_1(&format!("Old display size: {:?}", old_display_size).into());
+                                        web_sys::console::log_1(&format!("New display size: {:?}", display_size).into());
+
+                                        // Position in old image (accounting for scroll and padding)
+                                        let point_in_old_image_x = self.full_image_scroll_offset.x + mouse_in_viewport.x - old_x_padding;
+                                        let point_in_old_image_y = self.full_image_scroll_offset.y + mouse_in_viewport.y - old_y_padding;
+
+                                        // Normalized position (0-1) in the actual image
+                                        let norm_x = (point_in_old_image_x / old_display_size.x).clamp(0.0, 1.0);
+                                        let norm_y = (point_in_old_image_y / old_display_size.y).clamp(0.0, 1.0);
+
+                                        web_sys::console::log_1(&format!("Normalized point: ({:.3}, {:.3})", norm_x, norm_y).into());
+
+                                        // Where that point is in the new zoomed image
+                                        let point_in_new_image_x = norm_x * display_size.x;
+                                        let point_in_new_image_y = norm_y * display_size.y;
+
+                                        // Calculate new scroll offset to keep that point under mouse
+                                        let new_offset_x = (point_in_new_image_x + new_x_padding - mouse_in_viewport.x).max(0.0);
+                                        let new_offset_y = (point_in_new_image_y + new_y_padding - mouse_in_viewport.y).max(0.0);
+
+                                        web_sys::console::log_1(&format!("New offset: [{:.2} {:.2}]", new_offset_x, new_offset_y).into());
+
+                                        new_scroll_offset = egui::vec2(new_offset_x, new_offset_y);
+                                    }
+                                }
+
+                                // Create ScrollArea with scroll offset
+                                let scroll_output = egui::ScrollArea::both()
                                     .auto_shrink([false, false])
+                                    .id_salt(scroll_id)
+                                    .scroll_offset(new_scroll_offset)
                                     .show(ui, |ui| {
-                                        ui.centered_and_justified(|ui| {
+                                        // Center the image if it's smaller than viewport
+                                        let x_padding = ((ui.available_width() - display_size.x) / 2.0).max(0.0);
+                                        let y_padding = ((ui.available_height() - display_size.y) / 2.0).max(0.0);
+
+                                        ui.add_space(y_padding);
+                                        ui.horizontal(|ui| {
+                                            ui.add_space(x_padding);
                                             ui.image((texture.id(), display_size));
                                         });
                                     });
+
+                                // Update our tracked scroll offset from the actual state
+                                self.full_image_scroll_offset = scroll_output.state.offset;
                             } else {
                                 ui.centered_and_justified(|ui| {
                                     self.load_full_image(&selected_id, ctx);
