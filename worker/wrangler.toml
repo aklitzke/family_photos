@@ -1,0 +1,21 @@
+name = "family-photos-worker"
+main = "build/worker/shim.mjs"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
+
+[[r2_buckets]]
+binding = "google_drive_pics"
+bucket_name = "google-drive-pics"
+
+[[r2_buckets]]
+binding = "thumbnails"
+bucket_name = "thumbnails"
+
+# To deploy:
+# 1. Install wrangler: npm install -g wrangler
+# 2. Login: wrangler login
+# 3. Create R2 bucket: wrangler r2 bucket create family-photos
+# 4. Deploy: wrangler deploy

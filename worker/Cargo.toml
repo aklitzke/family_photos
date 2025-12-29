@@ -1,0 +1,18 @@
+[package]
+name = "family-photos"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+worker = "0.7.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+image = "0.25"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
