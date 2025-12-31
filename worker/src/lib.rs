@@ -1,6 +1,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
-use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata};
+use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata, ThumbnailBatchRequest, ThumbnailBatchResponse};
 use serde::Deserialize;
+use std::collections::HashMap;
 use worker::*;
 
 const GITHUB_API_URL: &str =
@@ -78,6 +79,9 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let router = Router::with_data(&env);
 
     router
+        .options("/api/images/thumbnails", |_req, _ctx| {
+            Response::empty()
+        })
         .get_async("/api/health", |_req, _ctx| async move {
             Response::from_json(&HealthResponse {
                 status: "ok".to_string(),
@@ -88,19 +92,22 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             let images = fetch_images_with_retry().await?;
             Response::from_json(&ImageListResponse { images })
         })
-        .get_async("/api/images/thumbnail/:id", |_req, ctx| async move {
-            let id = ctx.param("id").ok_or("Missing id parameter")?;
+        .get_async("/api/images/thumbnail", |req, ctx| async move {
+            let url = req.url()?;
+            let image_key = url
+                .query_pairs()
+                .find(|(k, _)| k == "key")
+                .map(|(_, v)| v.to_string())
+                .ok_or("Missing key parameter")?;
 
-            // Fetch images and find the image key from the ID
-            let image_entries = fetch_images_with_retry().await?;
-            let image_key = image_entries
-                .iter()
-                .find(|entry| entry.id == *id)
-                .map(|entry| entry.key.as_str())
-                .ok_or("Image not found")?;
+            // Change extension to .jpg for thumbnail lookup (all thumbnails are JPEG)
+            use std::path::Path;
+            let image_path = Path::new(&image_key);
+            let thumbnail_key_base = image_path.with_extension("jpg");
+            let thumbnail_key_str = thumbnail_key_base.to_str().ok_or("Invalid path")?;
 
             // Prefix thumbnail key with source bucket binding name
-            let thumbnail_key = format!("google_drive_pics/{}", image_key);
+            let thumbnail_key = format!("google_drive_pics/{}", thumbnail_key_str);
 
             // Get R2 buckets
             let source_bucket = ctx.env.bucket("google_drive_pics")?;
@@ -153,23 +160,87 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 ]))
             })
         })
-        .get_async("/api/images/full/:id", |_req, ctx| async move {
-            let id = ctx.param("id").ok_or("Missing id parameter")?;
+        .post_async("/api/images/thumbnails", |mut req, ctx| async move {
+            // Parse request body
+            let request: ThumbnailBatchRequest = req.json().await?;
 
-            // Fetch images and find the image key from the ID
-            let image_entries = fetch_images_with_retry().await?;
-            let image_key = image_entries
-                .iter()
-                .find(|entry| entry.id == *id)
-                .map(|entry| entry.key.as_str())
-                .ok_or("Image not found")?;
+            // Get R2 buckets
+            let source_bucket = ctx.env.bucket("google_drive_pics")?;
+            let thumbnails_bucket = ctx.env.bucket("thumbnails")?;
+
+            let mut thumbnails = HashMap::new();
+
+            // Process each requested key
+            for image_key in request.keys {
+                // Change extension to .jpg for thumbnail lookup (all thumbnails are JPEG)
+                use std::path::Path;
+                let image_path = Path::new(&image_key);
+                let thumbnail_key_base = image_path.with_extension("jpg");
+                let thumbnail_key_str = thumbnail_key_base.to_str().ok_or("Invalid path")?;
+                let thumbnail_key = format!("google_drive_pics/{}", thumbnail_key_str);
+
+                // Try to get existing thumbnail
+                let thumbnail_bytes = match thumbnails_bucket.get(&thumbnail_key).execute().await {
+                    Ok(Some(object)) => {
+                        console_log!("Thumbnail exists in R2: {}", thumbnail_key);
+                        let body = object.body().ok_or("No body")?;
+                        body.bytes().await?
+                    }
+                    _ => {
+                        // Generate thumbnail
+                        console_log!("Generating new thumbnail for: {}", image_key);
+
+                        // Fetch original image
+                        let original_object = match source_bucket.get(image_key.as_str()).execute().await {
+                            Ok(Some(obj)) => obj,
+                            _ => {
+                                console_log!("Failed to fetch original image: {}", image_key);
+                                continue; // Skip if original not found
+                            }
+                        };
+
+                        let original_body = original_object.body().ok_or("No body")?;
+                        let image_bytes = original_body.bytes().await?;
+
+                        // Generate thumbnail
+                        let thumbnail = match generate_thumbnail(&image_bytes, 300) {
+                            Ok(bytes) => bytes,
+                            Err(e) => {
+                                console_log!("Failed to generate thumbnail for {}: {}", image_key, e);
+                                continue; // Skip on error
+                            }
+                        };
+
+                        // Upload thumbnail to R2
+                        if let Err(e) = thumbnails_bucket.put(&thumbnail_key, thumbnail.clone()).execute().await {
+                            console_log!("Failed to upload thumbnail for {}: {:?}", image_key, e);
+                        } else {
+                            console_log!("Uploaded new thumbnail to R2: {}", thumbnail_key);
+                        }
+
+                        thumbnail
+                    }
+                };
+
+                thumbnails.insert(image_key, thumbnail_bytes);
+            }
+
+            Response::from_json(&ThumbnailBatchResponse { thumbnails })
+        })
+        .get_async("/api/images/full", |req, ctx| async move {
+            let url = req.url()?;
+            let image_key = url
+                .query_pairs()
+                .find(|(k, _)| k == "key")
+                .map(|(_, v)| v.to_string())
+                .ok_or("Missing key parameter")?;
 
             // Get source bucket
             let source_bucket = ctx.env.bucket("google_drive_pics")?;
 
             // Fetch image
             let object = source_bucket
-                .get(image_key)
+                .get(&image_key)
                 .execute()
                 .await?
                 .ok_or("Image not found")?;

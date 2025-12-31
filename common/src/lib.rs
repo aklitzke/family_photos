@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageMetadata {
-    pub id: String,
     pub key: String,
     pub name: String,
 }
@@ -21,4 +21,14 @@ pub struct HealthResponse {
 #[derive(Serialize, Deserialize)]
 pub struct HistoryData {
     pub images: Vec<ImageMetadata>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ThumbnailBatchRequest {
+    pub keys: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ThumbnailBatchResponse {
+    pub thumbnails: HashMap<String, Vec<u8>>,
 }
