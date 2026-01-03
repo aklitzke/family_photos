@@ -1,59 +1,55 @@
+[[artifacts]]
+images.front1 = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
+
+[[artifacts]]
+images.front1 = "Family History/Pile 15/FastFoto_0601.tif"
+images.back1 = "Family History/Pile 15/FastFoto_0601_b.tif"
+
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
-name = "Family Photo 1"
 
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-51-0002.jpg"
-name = "Family Photo 2"
 
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-51-0003.jpg"
-name = "Family Photo 3"
 
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-51-0004.jpg"
-name = "Family Photo 4"
 
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-54-0001.jpg"
-name = "Family Photo 5"
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0486.tif"
-name = "FastFoto_0486.tif"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0426.tif"
-name = "FastFoto_0426.tif"
+
+[[images]]
+key = "Family History/Pile 15/FastFoto_0601.tif"
 
 [[images]]
 key = "Family History/Pile 15/FastFoto_0601_b.tif"
-name = "FastFoto_0601_b.tif"
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0523_b.tif"
-name = "FastFoto_0523_b.tif"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0348.tif"
-name = "FastFoto_0348.tif"
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0526_b.tif"
-name = "FastFoto_0526_b.tif"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0347.tif"
-name = "FastFoto_0347.tif"
 
 [[images]]
 key = "Family History/Pile 4/2025-12-26-15-29-0014.jpg"
-name = "2025-12-26-15-29-0014"
 
 [[images]]
 key = "Family History/Pile 7/2025-12-26-20-22-0039.jpg"
-name = "2025-12-26-20-22-0039"
 
 [[images]]
 key = "Family History/Pile 4/2025-12-26-15-04-0057.jpg"
-name = "2025-12-26-15-04-0057"

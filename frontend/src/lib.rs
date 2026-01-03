@@ -344,11 +344,19 @@ impl FamilyPhotosApp {
     fn process_loaded_thumbnails(&mut self, ctx: &egui::Context) {
         let mut completed = Vec::new();
 
+        // Get rotation info from loaded images
+        let rotation_map: HashMap<String, Option<u16>> = if let LoadState::Loaded(images) = self.images.get() {
+            images.iter().map(|img| (img.key.clone(), img.rotation)).collect()
+        } else {
+            HashMap::new()
+        };
+
         for (id, loading_state) in &self.thumbnail_loading {
             let state = loading_state.lock().unwrap();
             match &*state {
                 LoadState::Loaded(data) => {
-                    if let Some(color_image) = load_image_from_bytes(data) {
+                    let rotation = rotation_map.get(id).and_then(|r| *r);
+                    if let Some(color_image) = load_image_from_bytes(data, rotation) {
                         let texture = ctx.load_texture(
                             format!("thumbnail_{}", id),
                             color_image,
@@ -377,11 +385,19 @@ impl FamilyPhotosApp {
     fn process_loaded_full_images(&mut self, ctx: &egui::Context) {
         let mut completed = Vec::new();
 
+        // Get rotation info from loaded images
+        let rotation_map: HashMap<String, Option<u16>> = if let LoadState::Loaded(images) = self.images.get() {
+            images.iter().map(|img| (img.key.clone(), img.rotation)).collect()
+        } else {
+            HashMap::new()
+        };
+
         for (id, loading_state) in &self.full_images_loading {
             let state = loading_state.lock().unwrap();
             match &*state {
                 LoadState::Loaded(data) => {
-                    if let Some(color_image) = load_image_from_bytes(data) {
+                    let rotation = rotation_map.get(id).and_then(|r| *r);
+                    if let Some(color_image) = load_image_from_bytes(data, rotation) {
                         let texture = ctx.load_texture(
                             format!("full_image_{}", id),
                             color_image,
@@ -658,7 +674,7 @@ impl eframe::App for FamilyPhotosApp {
                                                 ui.strong("Thumbnail");
                                             });
                                             header.col(|ui| {
-                                                ui.strong("Name");
+                                                ui.strong("Key");
                                             });
                                             header.col(|ui| {
                                                 ui.strong("Date");
@@ -722,7 +738,7 @@ impl eframe::App for FamilyPhotosApp {
                                                     });
 
                                                     row.col(|ui| {
-                                                        if ui.button(&image.name).clicked() {
+                                                        if ui.button(&image.key).clicked() {
                                                             clicked = true;
                                                         }
                                                     });
@@ -854,9 +870,19 @@ async fn fetch_thumbnails_batch(keys: &[String]) -> Result<HashMap<String, Vec<u
     Ok(batch_response.thumbnails)
 }
 
-fn load_image_from_bytes(bytes: &[u8]) -> Option<ColorImage> {
+fn load_image_from_bytes(bytes: &[u8], rotation: Option<u16>) -> Option<ColorImage> {
     match image::load_from_memory(bytes) {
-        Ok(dynamic_image) => {
+        Ok(mut dynamic_image) => {
+            // Apply rotation if specified
+            if let Some(degrees) = rotation {
+                dynamic_image = match degrees {
+                    90 => dynamic_image.rotate90(),
+                    180 => dynamic_image.rotate180(),
+                    270 => dynamic_image.rotate270(),
+                    _ => dynamic_image, // 0 or invalid, no rotation
+                };
+            }
+
             let rgba_image = dynamic_image.to_rgba8();
             let size = [rgba_image.width() as usize, rgba_image.height() as usize];
             let pixels = rgba_image.into_raw();

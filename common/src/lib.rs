@@ -4,7 +4,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageMetadata {
     pub key: String,
-    pub name: String,
+    pub rotation: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
