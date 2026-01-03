@@ -1,13 +1,19 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
 use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata, ThumbnailBatchRequest, ThumbnailBatchResponse};
-use serde::Deserialize;
 use std::collections::HashMap;
 use worker::*;
 
+#[cfg(not(debug_assertions))]
+use base64::{engine::general_purpose::STANDARD, Engine};
+#[cfg(not(debug_assertions))]
+use serde::Deserialize;
+
+#[cfg(not(debug_assertions))]
 const GITHUB_API_URL: &str =
     "https://api.github.com/repos/aklitzke/family_photos/contents/data/history.toml";
+#[cfg(not(debug_assertions))]
 const MAX_RETRIES: u32 = 3;
 
+#[cfg(not(debug_assertions))]
 #[derive(Deserialize)]
 struct GitHubContentsResponse {
     content: String,
@@ -15,9 +21,10 @@ struct GitHubContentsResponse {
     sha: String,
 }
 
-async fn fetch_images_with_retry() -> Result<Vec<ImageMetadata>> {
+#[cfg(not(debug_assertions))]
+async fn fetch_images_with_retry(env: &Env) -> Result<Vec<ImageMetadata>> {
     for attempt in 1..=MAX_RETRIES {
-        match fetch_images().await {
+        match fetch_images(env).await {
             Ok(images) => return Ok(images),
             Err(e) if attempt < MAX_RETRIES => {
                 console_log!("Fetch attempt {} failed: {}, retrying...", attempt, e);
@@ -29,7 +36,26 @@ async fn fetch_images_with_retry() -> Result<Vec<ImageMetadata>> {
     unreachable!()
 }
 
-async fn fetch_images() -> Result<Vec<ImageMetadata>> {
+#[cfg(debug_assertions)]
+async fn fetch_images_with_retry(env: &Env) -> Result<Vec<ImageMetadata>> {
+    fetch_images(env).await
+}
+
+async fn fetch_images(_env: &Env) -> Result<Vec<ImageMetadata>> {
+    // In debug builds (local dev), use bundled history.toml
+    #[cfg(debug_assertions)]
+    {
+        console_log!("Using bundled history.toml from local file (debug mode)");
+        const HISTORY_TOML_CONTENT: &str = include_str!("../../data/history.toml");
+        let data: HistoryData = toml::from_str(HISTORY_TOML_CONTENT)
+            .map_err(|e| format!("Failed to parse bundled TOML: {}", e))?;
+        return Ok(data.images);
+    }
+
+    // In release builds (production), fetch from GitHub
+    #[cfg(not(debug_assertions))]
+    {
+        console_log!("Fetching history.toml from GitHub API");
     let mut request = Request::new(GITHUB_API_URL, Method::Get)?;
 
     // GitHub API requires User-Agent header
@@ -66,6 +92,7 @@ async fn fetch_images() -> Result<Vec<ImageMetadata>> {
         toml::from_str(&toml_content).map_err(|e| format!("Failed to parse TOML: {}", e))?;
 
     Ok(data.images)
+    }
 }
 
 #[event(fetch)]
@@ -88,8 +115,8 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 message: "Worker is running".to_string(),
             })
         })
-        .get_async("/api/images/list", |_req, _ctx| async move {
-            let images = fetch_images_with_retry().await?;
+        .get_async("/api/images/list", |_req, ctx| async move {
+            let images = fetch_images_with_retry(&ctx.env).await?;
             Response::from_json(&ImageListResponse { images })
         })
         .get_async("/api/images/thumbnail", |req, ctx| async move {
