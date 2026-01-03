@@ -3,12 +3,14 @@
 ### Development
 
 **Worker (with remote R2):**
+
 ```bash
 cd worker
-wrangler dev --remote
+npx wrangler dev --remote
 ```
 
 **Frontend (with hot reload):**
+
 ```bash
 cd frontend
 trunk serve
