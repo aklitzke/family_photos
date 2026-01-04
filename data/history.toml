@@ -1,13 +1,19 @@
 [[artifacts]]
-images.front1 = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
+
+[artifacts.images]
+front1 = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
 
 [[artifacts]]
-images.front1 = "Family History/Pile 15/FastFoto_0601.tif"
-images.back1 = "Family History/Pile 15/FastFoto_0601_b.tif"
+
+[artifacts.images]
+front1 = "Family History/Pile 15/FastFoto_0601.tif"
+back1 = "Family History/Pile 15/FastFoto_0601_b.tif"
 
 [[artifacts]]
-images.front1 = "Family History/Pile 13/FastFoto_0486.tif"
-images.back1 = "Family History/Pile 13/FastFoto_0486_b.tif"
+
+[artifacts.images]
+front1 = "Family History/Pile 13/FastFoto_0486.tif"
+back1 = "Family History/Pile 13/FastFoto_0486_b.tif"
 
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
@@ -25,11 +31,71 @@ key = "Family History/Pile 1/2025-12-23-21-51-0004.jpg"
 key = "Family History/Pile 1/2025-12-23-21-54-0001.jpg"
 
 [[images]]
+key = "Family History/Pile 1/2025-12-23-21-54-0002.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-23-21-54-0003.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-23-21-54-0004.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0001.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0002.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0003.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0004.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0005.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0006.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0007.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0008.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0009.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0010.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0011.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0012.jpg"
+
+[[images]]
+key = "Family History/Pile 1/2025-12-24-12-13-0013.jpg"
+
+[[images]]
+key = "Family History/Pile 12/FastFoto_0347.tif"
+
+[[images]]
+key = "Family History/Pile 12/FastFoto_0348.tif"
+
+[[images]]
+key = "Family History/Pile 12/FastFoto_0426.tif"
+
+[[images]]
 key = "Family History/Pile 13/FastFoto_0486.tif"
 rotation = 270
 
 [[images]]
-key = "Family History/Pile 12/FastFoto_0426.tif"
+key = "Family History/Pile 13/FastFoto_0523_b.tif"
+
+[[images]]
+key = "Family History/Pile 13/FastFoto_0526_b.tif"
 
 [[images]]
 key = "Family History/Pile 15/FastFoto_0601.tif"
@@ -38,22 +104,232 @@ key = "Family History/Pile 15/FastFoto_0601.tif"
 key = "Family History/Pile 15/FastFoto_0601_b.tif"
 
 [[images]]
-key = "Family History/Pile 13/FastFoto_0523_b.tif"
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0800.tif"
 
 [[images]]
-key = "Family History/Pile 12/FastFoto_0348.tif"
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0800_b.tif"
 
 [[images]]
-key = "Family History/Pile 13/FastFoto_0526_b.tif"
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0801.tif"
 
 [[images]]
-key = "Family History/Pile 12/FastFoto_0347.tif"
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0801_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0802.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0802_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0803.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0803_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0804.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0804_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0805.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0805_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0806.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0806_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0807.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0807_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0808.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0808_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0809.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0809_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0810.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0810_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0811.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0811_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0812.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0812_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0813.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0813_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0814.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0814_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0815.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0815_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0816.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0816_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0817.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0817_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0818.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0818_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0819.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0819_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0820.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0820_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0821.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0821_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0822.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0822_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0823.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0823_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0824.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0824_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0825.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0825_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0826.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0826_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0827.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0827_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0828.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0828_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0829.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0829_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0830.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0830_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0831.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0831_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0832.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0832_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0833.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0833_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0834.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0834_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0835.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0835_b.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0836.tif"
+
+[[images]]
+key = "Family History/Pile 21 Lakewood Box/FastFoto_0836_b.tif"
+
+[[images]]
+key = "Family History/Pile 4/2025-12-26-15-04-0057.jpg"
 
 [[images]]
 key = "Family History/Pile 4/2025-12-26-15-29-0014.jpg"
 
 [[images]]
 key = "Family History/Pile 7/2025-12-26-20-22-0039.jpg"
-
-[[images]]
-key = "Family History/Pile 4/2025-12-26-15-04-0057.jpg"

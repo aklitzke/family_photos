@@ -97,6 +97,10 @@ The frontend runs on `http://localhost:8080` in development.
 ```bash
 cd scripts
 
+# Add all images from a directory to history.toml
+# Run without arguments to see all options (base path stripping, prefix, etc.)
+cargo run --bin add_images_to_history /path/to/images
+
 # Generate thumbnails locally
 cargo run --bin generate_thumbnails
 
@@ -104,7 +108,9 @@ cargo run --bin generate_thumbnails
 cargo run --bin list_r2_files
 ```
 
-**Note**: Scripts require AWS credentials configured in environment variables for R2 access.
+**Note**:
+- `add_images_to_history` only requires filesystem access
+- `generate_thumbnails` and `list_r2_files` require AWS credentials configured in environment variables for R2 access
 
 ### Testing
 
