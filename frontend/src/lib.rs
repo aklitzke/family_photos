@@ -1,4 +1,4 @@
-use common::{HealthResponse, ImageListResponse, ImageMetadata, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{HealthResponse, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -328,13 +328,23 @@ impl FamilyPhotosApp {
         let ctx_clone = ctx.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
-            match fetch_image(&format!("/api/images/full?key={}", key_encoded)).await {
-                Ok(image_data) => {
-                    *loading_state.lock().unwrap() = LoadState::Loaded(image_data);
-                    ctx_clone.request_repaint();
+            // First, get the presigned URL from the API
+            match fetch_json::<PresignedUrlResponse>(&format!("/api/images/full?key={}", key_encoded)).await {
+                Ok(response) => {
+                    // Then fetch the actual image from the presigned URL
+                    match fetch_image_from_url(&response.url).await {
+                        Ok(image_data) => {
+                            *loading_state.lock().unwrap() = LoadState::Loaded(image_data);
+                            ctx_clone.request_repaint();
+                        }
+                        Err(e) => {
+                            *loading_state.lock().unwrap() = LoadState::Failed(format!("Failed to fetch image from R2: {}", e));
+                            ctx_clone.request_repaint();
+                        }
+                    }
                 }
                 Err(e) => {
-                    *loading_state.lock().unwrap() = LoadState::Failed(e);
+                    *loading_state.lock().unwrap() = LoadState::Failed(format!("Failed to get presigned URL: {}", e));
                     ctx_clone.request_repaint();
                 }
             }
@@ -828,6 +838,21 @@ async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, Stri
 async fn fetch_image(url: &str) -> Result<Vec<u8>, String> {
     let full_url = format!("{}{}", API_BASE_URL, url);
     let response = ehttp::fetch_async(ehttp::Request::get(&full_url))
+        .await
+        .map_err(|e| format!("Fetch failed: {}", e))?;
+
+    if !response.ok {
+        return Err(format!(
+            "HTTP error: {} {}",
+            response.status, response.status_text
+        ));
+    }
+
+    Ok(response.bytes)
+}
+
+async fn fetch_image_from_url(url: &str) -> Result<Vec<u8>, String> {
+    let response = ehttp::fetch_async(ehttp::Request::get(url))
         .await
         .map_err(|e| format!("Fetch failed: {}", e))?;
 

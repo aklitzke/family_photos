@@ -19,4 +19,3 @@ rand = "0.8"
 common = { path = "../common" }
 walkdir = "2.4"
 image = "0.25"
-family-photos = { path = "../worker" }

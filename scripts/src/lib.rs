@@ -24,8 +24,8 @@ pub struct R2File {
 }
 
 pub async fn list_r2_bucket(bucket_binding: &str) -> Result<(String, Vec<R2File>), Box<dyn Error>> {
-    // Load .env file if it exists
-    dotenv::dotenv().ok();
+    // Load environment variables from worker's .dev.vars
+    dotenv::from_path("../worker/.dev.vars").ok();
 
     // Read wrangler.toml to get bucket name
     let wrangler_path = "../worker/wrangler.toml";

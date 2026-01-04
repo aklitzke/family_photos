@@ -32,3 +32,8 @@ pub struct ThumbnailBatchRequest {
 pub struct ThumbnailBatchResponse {
     pub thumbnails: HashMap<String, Vec<u8>>,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct PresignedUrlResponse {
+    pub url: String,
+}

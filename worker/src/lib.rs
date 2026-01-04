@@ -1,4 +1,7 @@
-use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata, ThumbnailBatchRequest, ThumbnailBatchResponse};
+mod sigv4;
+
+use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use sigv4::generate_r2_presigned_url;
 use std::collections::HashMap;
 use worker::*;
 
@@ -144,7 +147,6 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             match thumbnails_bucket.get(&thumbnail_key).execute().await {
                 Ok(Some(object)) => {
                     // Thumbnail exists, return it
-                    console_log!("Thumbnail exists in R2: {}", thumbnail_key);
                     let body = object.body().ok_or("No body")?;
                     return Response::from_bytes(body.bytes().await?)
                         .map(|r| r.with_headers(Headers::from_iter(vec![
@@ -209,7 +211,6 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 // Try to get existing thumbnail
                 let thumbnail_bytes = match thumbnails_bucket.get(&thumbnail_key).execute().await {
                     Ok(Some(object)) => {
-                        console_log!("Thumbnail exists in R2: {}", thumbnail_key);
                         let body = object.body().ok_or("No body")?;
                         body.bytes().await?
                     }
@@ -262,25 +263,21 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 .map(|(_, v)| v.to_string())
                 .ok_or("Missing key parameter")?;
 
-            // Get source bucket
-            let source_bucket = ctx.env.bucket("google_drive_pics")?;
+            // Get R2 credentials from environment
+            let account_id = ctx.env.var("CLOUDFLARE_ACCOUNT_ID")?.to_string();
+            let access_key_id = ctx.env.var("R2_ACCESS_KEY_ID")?.to_string();
+            let secret_access_key = ctx.env.var("R2_SECRET_ACCESS_KEY")?.to_string();
 
-            // Fetch image
-            let object = source_bucket
-                .get(&image_key)
-                .execute()
-                .await?
-                .ok_or("Image not found")?;
+            // Generate presigned URL manually using SigV4
+            let presigned_url = generate_r2_presigned_url(
+                &account_id,
+                &access_key_id,
+                &secret_access_key,
+                &image_key,
+                3600,
+            )?;
 
-            let body = object.body().ok_or("No body")?;
-            let image_bytes = body.bytes().await?;
-
-            Response::from_bytes(image_bytes).map(|r| {
-                r.with_headers(Headers::from_iter(vec![
-                    ("Content-Type", "image/jpeg"),
-                    ("Cache-Control", "public, max-age=86400"),
-                ]))
-            })
+            Response::from_json(&PresignedUrlResponse { url: presigned_url })
         })
         .run(req, env.clone())
         .await?

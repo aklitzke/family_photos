@@ -23,3 +23,7 @@ frontend/dist
 
 node_modules
 .wrangler
+
+# Environment variables
+.env
+.dev.vars

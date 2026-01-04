@@ -26,7 +26,7 @@ persist = true
 # Development environment - builds in debug mode to use bundled history.toml
 [env.dev]
 [env.dev.build]
-command = "cargo install -q -f worker-build && worker-build --dev"
+command = "cargo install -q worker-build && worker-build --dev"
 
 [[env.dev.r2_buckets]]
 binding = "google_drive_pics"
