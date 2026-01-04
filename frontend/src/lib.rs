@@ -16,6 +16,7 @@ const API_BASE_URL: &str = if cfg!(debug_assertions) {
 const ZOOM_MIN: f32 = 0.1;
 const ZOOM_MAX: f32 = 50.0;
 const ZOOM_DEFAULT: f32 = 1.0;
+const THUMBNAIL_BATCH_SIZE: usize = 50;
 
 #[derive(Clone, PartialEq)]
 enum Page {
@@ -697,9 +698,13 @@ impl eframe::App for FamilyPhotosApp {
                                 LoadState::Loaded(images) => {
                                     let thumbnail_height = 80.0;
 
-                                    // Load all thumbnails in a single batch request
+                                    // Load thumbnails in batches to avoid overwhelming the server
                                     let image_keys: Vec<String> = images.iter().map(|img| img.key.clone()).collect();
-                                    self.load_thumbnails_batch(image_keys, ctx);
+
+                                    // Split into chunks and load each batch
+                                    for chunk in image_keys.chunks(THUMBNAIL_BATCH_SIZE) {
+                                        self.load_thumbnails_batch(chunk.to_vec(), ctx);
+                                    }
 
                                     use egui_extras::{TableBuilder, Column};
 
@@ -857,11 +862,15 @@ impl eframe::App for FamilyPhotosApp {
                                     LoadState::Loaded(artifacts) => {
                                         let thumbnail_height = 80.0;
 
-                                        // Load all front1 thumbnails in a batch
+                                        // Load front1 thumbnails in batches
                                         let front_keys: Vec<String> = artifacts.iter()
                                             .map(|artifact| artifact.images.front1.clone())
                                             .collect();
-                                        self.load_thumbnails_batch(front_keys, ctx);
+
+                                        // Split into chunks and load each batch
+                                        for chunk in front_keys.chunks(THUMBNAIL_BATCH_SIZE) {
+                                            self.load_thumbnails_batch(chunk.to_vec(), ctx);
+                                        }
 
                                         use egui_extras::{TableBuilder, Column};
 
