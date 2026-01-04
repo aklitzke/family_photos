@@ -18,8 +18,26 @@ pub struct HealthResponse {
     pub message: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ArtifactImages {
+    pub front1: String,
+    pub back1: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Artifact {
+    pub images: ArtifactImages,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ArtifactListResponse {
+    pub artifacts: Vec<Artifact>,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct HistoryData {
+    #[serde(default)]
+    pub artifacts: Vec<Artifact>,
     pub images: Vec<ImageMetadata>,
 }
 

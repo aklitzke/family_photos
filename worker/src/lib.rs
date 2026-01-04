@@ -1,6 +1,6 @@
 mod sigv4;
 
-use common::{HealthResponse, HistoryData, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{ArtifactListResponse, HealthResponse, HistoryData, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
 use sigv4::generate_r2_presigned_url;
 use std::collections::HashMap;
 use worker::*;
@@ -44,7 +44,7 @@ async fn fetch_images_with_retry(env: &Env) -> Result<Vec<ImageMetadata>> {
     fetch_images(env).await
 }
 
-async fn fetch_images(_env: &Env) -> Result<Vec<ImageMetadata>> {
+async fn fetch_history_data(_env: &Env) -> Result<HistoryData> {
     // In debug builds (local dev), use bundled history.toml
     #[cfg(debug_assertions)]
     {
@@ -52,7 +52,7 @@ async fn fetch_images(_env: &Env) -> Result<Vec<ImageMetadata>> {
         const HISTORY_TOML_CONTENT: &str = include_str!("../../data/history.toml");
         let data: HistoryData = toml::from_str(HISTORY_TOML_CONTENT)
             .map_err(|e| format!("Failed to parse bundled TOML: {}", e))?;
-        return Ok(data.images);
+        return Ok(data);
     }
 
     // In release builds (production), fetch from GitHub
@@ -94,8 +94,13 @@ async fn fetch_images(_env: &Env) -> Result<Vec<ImageMetadata>> {
     let data: HistoryData =
         toml::from_str(&toml_content).map_err(|e| format!("Failed to parse TOML: {}", e))?;
 
-    Ok(data.images)
+    Ok(data)
     }
+}
+
+async fn fetch_images(env: &Env) -> Result<Vec<ImageMetadata>> {
+    let data = fetch_history_data(env).await?;
+    Ok(data.images)
 }
 
 #[event(fetch)]
@@ -121,6 +126,10 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/api/images/list", |_req, ctx| async move {
             let images = fetch_images_with_retry(&ctx.env).await?;
             Response::from_json(&ImageListResponse { images })
+        })
+        .get_async("/api/artifacts/list", |_req, ctx| async move {
+            let history_data = fetch_history_data(&ctx.env).await?;
+            Response::from_json(&ArtifactListResponse { artifacts: history_data.artifacts })
         })
         .get_async("/api/images/thumbnail", |req, ctx| async move {
             let url = req.url()?;

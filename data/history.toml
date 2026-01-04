@@ -5,6 +5,10 @@ images.front1 = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
 images.front1 = "Family History/Pile 15/FastFoto_0601.tif"
 images.back1 = "Family History/Pile 15/FastFoto_0601_b.tif"
 
+[[artifacts]]
+images.front1 = "Family History/Pile 13/FastFoto_0486.tif"
+images.back1 = "Family History/Pile 13/FastFoto_0486_b.tif"
+
 [[images]]
 key = "Family History/Pile 1/2025-12-23-21-51-0001.jpg"
 

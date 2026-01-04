@@ -1,4 +1,4 @@
-use common::{HealthResponse, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{Artifact, ArtifactListResponse, HealthResponse, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -20,6 +20,7 @@ const ZOOM_DEFAULT: f32 = 1.0;
 #[derive(Clone, PartialEq)]
 enum Page {
     Images,
+    Artifacts,
     Health,
 }
 
@@ -186,10 +187,12 @@ pub fn start() -> Result<(), JsValue> {
 struct FamilyPhotosApp {
     current_page: Page,
     images: AsyncResource<Vec<ImageMetadata>>,
+    artifacts: AsyncResource<Vec<Artifact>>,
     thumbnails: HashMap<String, TextureHandle>,
     thumbnail_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     thumbnail_failures: HashMap<String, String>,  // Track permanent failures
     selected_image: Option<String>,
+    selected_artifact: Option<usize>,  // Index of selected artifact for detail view
     full_images: HashMap<String, TextureHandle>,
     full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     full_image_failures: HashMap<String, String>,  // Track permanent failures
@@ -202,10 +205,12 @@ impl FamilyPhotosApp {
         Self {
             current_page: Page::Images,
             images: AsyncResource::new(),
+            artifacts: AsyncResource::new(),
             thumbnails: HashMap::new(),
             thumbnail_loading: HashMap::new(),
             thumbnail_failures: HashMap::new(),
             selected_image: None,
+            selected_artifact: None,
             full_images: HashMap::new(),
             full_images_loading: HashMap::new(),
             full_image_failures: HashMap::new(),
@@ -433,6 +438,28 @@ impl FamilyPhotosApp {
         }
     }
 
+    fn load_artifacts(&mut self, ctx: &egui::Context) {
+        if self.artifacts.is_loading() || !self.artifacts.is_not_started() {
+            return;
+        }
+
+        let artifacts_state = self.artifacts.start_loading();
+        let ctx_clone = ctx.clone();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            match fetch_json::<ArtifactListResponse>("/api/artifacts/list").await {
+                Ok(response) => {
+                    *artifacts_state.lock().unwrap() = LoadState::Loaded(response.artifacts);
+                    ctx_clone.request_repaint();
+                }
+                Err(e) => {
+                    *artifacts_state.lock().unwrap() = LoadState::Failed(e);
+                    ctx_clone.request_repaint();
+                }
+            }
+        });
+    }
+
     fn load_health(&mut self, ctx: &egui::Context) {
         if self.health.is_loading() || !self.health.is_not_started() {
             return;
@@ -469,6 +496,10 @@ impl FamilyPhotosApp {
                 ui.heading("Family Photos");
                 ui.add_space(20.0);
 
+                if ui.selectable_label(self.current_page == Page::Artifacts, "Artifacts").clicked() {
+                    self.current_page = Page::Artifacts;
+                }
+
                 if ui.selectable_label(self.current_page == Page::Images, "Images").clicked() {
                     self.current_page = Page::Images;
                 }
@@ -483,6 +514,7 @@ impl FamilyPhotosApp {
 impl eframe::App for FamilyPhotosApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.images.process();
+        self.artifacts.process();
         self.process_loaded_thumbnails(ctx);
         self.process_loaded_full_images(ctx);
         self.health.process();
@@ -781,6 +813,169 @@ impl eframe::App for FamilyPhotosApp {
                                 LoadState::NotStarted => {}
                             }
                         });
+                    }
+                    Page::Artifacts => {
+                        // Check if we're viewing artifact detail
+                        if let Some(artifact_idx) = self.selected_artifact {
+                            // Artifact detail view (placeholder for now)
+                            ui.vertical_centered(|ui| {
+                                ui.add_space(40.0);
+
+                                if ui.button(egui::RichText::new("← Back to Artifacts").size(18.0)).clicked() {
+                                    self.selected_artifact = None;
+                                }
+
+                                ui.add_space(20.0);
+                                ui.heading(egui::RichText::new(format!("Artifact {}", artifact_idx + 1)).size(48.0).strong());
+                                ui.add_space(30.0);
+
+                                ui.label(egui::RichText::new("Artifact detail view coming soon...").size(20.0));
+                            });
+                        } else {
+                            // Artifact list view
+                            ui.vertical_centered(|ui| {
+                                ui.add_space(40.0);
+                                ui.heading(egui::RichText::new("Artifacts").size(48.0).strong());
+                                ui.add_space(10.0);
+                                ui.label(egui::RichText::new("Click an artifact to view details").size(16.0));
+                                ui.add_space(30.0);
+
+                                if matches!(self.artifacts.get(), LoadState::NotStarted) {
+                                    self.load_artifacts(ctx);
+                                }
+
+                                match self.artifacts.get().clone() {
+                                    LoadState::Loading => {
+                                        ui.label(egui::RichText::new("Loading artifacts...").size(20.0));
+                                    }
+                                    LoadState::Failed(err) => {
+                                        ui.colored_label(
+                                            egui::Color32::RED,
+                                            egui::RichText::new(format!("Error: {}", err)).size(16.0),
+                                        );
+                                    }
+                                    LoadState::Loaded(artifacts) => {
+                                        let thumbnail_height = 80.0;
+
+                                        // Load all front1 thumbnails in a batch
+                                        let front_keys: Vec<String> = artifacts.iter()
+                                            .map(|artifact| artifact.images.front1.clone())
+                                            .collect();
+                                        self.load_thumbnails_batch(front_keys, ctx);
+
+                                        use egui_extras::{TableBuilder, Column};
+
+                                        TableBuilder::new(ui)
+                                            .striped(true)
+                                            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                                            .column(Column::exact(100.0))
+                                            .column(Column::remainder().at_least(150.0))
+                                            .column(Column::exact(120.0))
+                                            .column(Column::exact(100.0))
+                                            .column(Column::exact(150.0))
+                                            .header(30.0, |mut header| {
+                                                header.col(|ui| {
+                                                    ui.strong("Thumbnail");
+                                                });
+                                                header.col(|ui| {
+                                                    ui.strong("Key");
+                                                });
+                                                header.col(|ui| {
+                                                    ui.strong("Date");
+                                                });
+                                                header.col(|ui| {
+                                                    ui.strong("Size");
+                                                });
+                                                header.col(|ui| {
+                                                    ui.strong("Tags");
+                                                });
+                                            })
+                                            .body(|mut body| {
+                                                for (idx, artifact) in artifacts.iter().enumerate() {
+                                                    let front_key = &artifact.images.front1;
+                                                    let is_selected = self.selected_artifact == Some(idx);
+
+                                                    body.row(thumbnail_height, |mut row| {
+                                                        row.set_selected(is_selected);
+
+                                                        let mut clicked = false;
+
+                                                        row.col(|ui| {
+                                                            if let Some(texture) = self.thumbnails.get(front_key) {
+                                                                let texture_size = texture.size_vec2();
+                                                                let aspect_ratio = texture_size.x / texture_size.y;
+                                                                let display_width = thumbnail_height * aspect_ratio;
+                                                                let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
+
+                                                                let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
+
+                                                                if response.clicked() {
+                                                                    clicked = true;
+                                                                }
+
+                                                                if response.hovered() {
+                                                                    let enlarged_height = 300.0;
+                                                                    let enlarged_width = enlarged_height * aspect_ratio;
+                                                                    let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
+
+                                                                    let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
+                                                                    let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
+
+                                                                    egui::Area::new(egui::Id::new(format!("hover_preview_artifact_{}", idx)))
+                                                                        .fixed_pos(popup_pos)
+                                                                        .order(egui::Order::Tooltip)
+                                                                        .show(ui.ctx(), |ui| {
+                                                                            egui::Frame::popup(ui.style())
+                                                                                .show(ui, |ui| {
+                                                                                    ui.image((texture.id(), enlarged_size));
+                                                                                });
+                                                                        });
+                                                                }
+                                                            } else if let Some(err) = self.thumbnail_failures.get(front_key) {
+                                                                ui.colored_label(
+                                                                    egui::Color32::RED,
+                                                                    format!("Error: {}", err)
+                                                                );
+                                                            } else {
+                                                                ui.label("Loading...");
+                                                            }
+                                                        });
+
+                                                        row.col(|ui| {
+                                                            if ui.button(front_key).clicked() {
+                                                                clicked = true;
+                                                            }
+                                                        });
+
+                                                        row.col(|ui| {
+                                                            if ui.selectable_label(false, "—").clicked() {
+                                                                clicked = true;
+                                                            }
+                                                        });
+
+                                                        row.col(|ui| {
+                                                            if ui.selectable_label(false, "—").clicked() {
+                                                                clicked = true;
+                                                            }
+                                                        });
+
+                                                        row.col(|ui| {
+                                                            if ui.selectable_label(false, "—").clicked() {
+                                                                clicked = true;
+                                                            }
+                                                        });
+
+                                                        if clicked {
+                                                            self.selected_artifact = Some(idx);
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                    }
+                                    LoadState::NotStarted => {}
+                                }
+                            });
+                        }
                     }
                     Page::Health => {
                         ui.vertical_centered(|ui| {
