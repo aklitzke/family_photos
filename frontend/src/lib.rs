@@ -16,7 +16,7 @@ const API_BASE_URL: &str = if cfg!(debug_assertions) {
 const ZOOM_MIN: f32 = 0.1;
 const ZOOM_MAX: f32 = 50.0;
 const ZOOM_DEFAULT: f32 = 1.0;
-const THUMBNAIL_BATCH_SIZE: usize = 50;
+const THUMBNAIL_BATCH_SIZE: usize = 10;
 
 #[derive(Clone, PartialEq)]
 enum Page {
@@ -822,20 +822,147 @@ impl eframe::App for FamilyPhotosApp {
                     Page::Artifacts => {
                         // Check if we're viewing artifact detail
                         if let Some(artifact_idx) = self.selected_artifact {
-                            // Artifact detail view (placeholder for now)
-                            ui.vertical_centered(|ui| {
-                                ui.add_space(40.0);
+                            // Artifact detail view
+                            let artifact = match &self.artifacts.state {
+                                LoadState::Loaded(artifacts) => {
+                                    if artifact_idx < artifacts.len() {
+                                        Some(artifacts[artifact_idx].clone())
+                                    } else {
+                                        None
+                                    }
+                                }
+                                _ => None,
+                            };
 
+                            if let Some(artifact) = artifact {
+                                ui.add_space(20.0);
+
+                                // Back button
                                 if ui.button(egui::RichText::new("← Back to Artifacts").size(18.0)).clicked() {
                                     self.selected_artifact = None;
                                 }
 
                                 ui.add_space(20.0);
-                                ui.heading(egui::RichText::new(format!("Artifact {}", artifact_idx + 1)).size(48.0).strong());
-                                ui.add_space(30.0);
 
-                                ui.label(egui::RichText::new("Artifact detail view coming soon...").size(20.0));
-                            });
+                                // Layout: Image grid on the left, attributes on the right
+                                ui.horizontal(|ui| {
+                                    // Left side: Image grid
+                                    ui.vertical(|ui| {
+                                        ui.heading(egui::RichText::new(format!("Artifact {}", artifact_idx + 1)).size(32.0));
+                                        ui.add_space(20.0);
+
+                                        // Collect all image keys
+                                        let mut image_keys = vec![artifact.images.front1.clone()];
+                                        if let Some(front2) = &artifact.images.front2 {
+                                            image_keys.push(front2.clone());
+                                        }
+                                        if let Some(back1) = &artifact.images.back1 {
+                                            image_keys.push(back1.clone());
+                                        }
+
+                                        // Load thumbnails for all images
+                                        self.load_thumbnails_batch(image_keys.clone(), ctx);
+
+                                        // Display images in a grid (2 columns)
+                                        let grid_size = 300.0;
+                                        let spacing = 20.0;
+
+                                        ui.horizontal_wrapped(|ui| {
+                                            ui.spacing_mut().item_spacing = egui::vec2(spacing, spacing);
+
+                                            // Front 1
+                                            ui.vertical(|ui| {
+                                                ui.label(egui::RichText::new("Front 1").strong());
+                                                if let Some(texture) = self.thumbnails.get(&artifact.images.front1) {
+                                                    let texture_size = texture.size_vec2();
+
+                                                    // Fit within bounds while maintaining aspect ratio
+                                                    let scale = (grid_size / texture_size.x).min(grid_size / texture_size.y);
+                                                    let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
+
+                                                    if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
+                                                        self.selected_image = Some(artifact.images.front1.clone());
+                                                    }
+                                                } else {
+                                                    ui.label("Loading...");
+                                                }
+                                            });
+
+                                            // Front 2
+                                            if let Some(front2) = &artifact.images.front2 {
+                                                ui.vertical(|ui| {
+                                                    ui.label(egui::RichText::new("Front 2").strong());
+                                                    if let Some(texture) = self.thumbnails.get(front2) {
+                                                        let texture_size = texture.size_vec2();
+
+                                                        // Fit within bounds while maintaining aspect ratio
+                                                        let scale = (grid_size / texture_size.x).min(grid_size / texture_size.y);
+                                                        let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
+
+                                                        if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
+                                                            self.selected_image = Some(front2.clone());
+                                                        }
+                                                    } else {
+                                                        ui.label("Loading...");
+                                                    }
+                                                });
+                                            }
+
+                                            // Back 1
+                                            if let Some(back1) = &artifact.images.back1 {
+                                                ui.vertical(|ui| {
+                                                    ui.label(egui::RichText::new("Back 1").strong());
+                                                    if let Some(texture) = self.thumbnails.get(back1) {
+                                                        let texture_size = texture.size_vec2();
+
+                                                        // Fit within bounds while maintaining aspect ratio
+                                                        let scale = (grid_size / texture_size.x).min(grid_size / texture_size.y);
+                                                        let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
+
+                                                        if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
+                                                            self.selected_image = Some(back1.clone());
+                                                        }
+                                                    } else {
+                                                        ui.label("Loading...");
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    });
+
+                                    ui.add_space(40.0);
+
+                                    // Right side: Attributes
+                                    ui.vertical(|ui| {
+                                        ui.heading(egui::RichText::new("Attributes").size(24.0));
+                                        ui.add_space(20.0);
+
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("Date:").strong());
+                                            ui.label("—");
+                                        });
+
+                                        ui.add_space(10.0);
+
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("Size:").strong());
+                                            ui.label("—");
+                                        });
+
+                                        ui.add_space(10.0);
+
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("Tags:").strong());
+                                            ui.label("—");
+                                        });
+                                    });
+                                });
+                            } else {
+                                ui.vertical_centered(|ui| {
+                                    ui.add_space(40.0);
+                                    ui.label("Artifact not found");
+                                });
+                            }
                         } else {
                             // Artifact list view
                             ui.vertical_centered(|ui| {
@@ -878,16 +1005,12 @@ impl eframe::App for FamilyPhotosApp {
                                             .striped(true)
                                             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                                             .column(Column::exact(100.0))
-                                            .column(Column::remainder().at_least(150.0))
                                             .column(Column::exact(120.0))
                                             .column(Column::exact(100.0))
-                                            .column(Column::exact(150.0))
+                                            .column(Column::remainder().at_least(150.0))
                                             .header(30.0, |mut header| {
                                                 header.col(|ui| {
                                                     ui.strong("Thumbnail");
-                                                });
-                                                header.col(|ui| {
-                                                    ui.strong("Key");
                                                 });
                                                 header.col(|ui| {
                                                     ui.strong("Date");
@@ -912,9 +1035,14 @@ impl eframe::App for FamilyPhotosApp {
                                                         row.col(|ui| {
                                                             if let Some(texture) = self.thumbnails.get(front_key) {
                                                                 let texture_size = texture.size_vec2();
-                                                                let aspect_ratio = texture_size.x / texture_size.y;
-                                                                let display_width = thumbnail_height * aspect_ratio;
-                                                                let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
+
+                                                                // Fit within bounds while maintaining aspect ratio
+                                                                let max_width = 90.0;
+                                                                let max_height = thumbnail_height;
+                                                                let scale_x = max_width / texture_size.x;
+                                                                let scale_y = max_height / texture_size.y;
+                                                                let scale = scale_x.min(scale_y);
+                                                                let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
 
                                                                 let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
 
@@ -923,6 +1051,7 @@ impl eframe::App for FamilyPhotosApp {
                                                                 }
 
                                                                 if response.hovered() {
+                                                                    let aspect_ratio = texture_size.x / texture_size.y;
                                                                     let enlarged_height = 300.0;
                                                                     let enlarged_width = enlarged_height * aspect_ratio;
                                                                     let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
@@ -947,12 +1076,6 @@ impl eframe::App for FamilyPhotosApp {
                                                                 );
                                                             } else {
                                                                 ui.label("Loading...");
-                                                            }
-                                                        });
-
-                                                        row.col(|ui| {
-                                                            if ui.button(front_key).clicked() {
-                                                                clicked = true;
                                                             }
                                                         });
 
