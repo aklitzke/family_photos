@@ -909,6 +909,11 @@ impl eframe::App for FamilyPhotosApp {
                     Page::Artifacts => {
                         // Check if we're viewing artifact detail (parse from URL)
                         if let Some(artifact_idx) = self.get_selected_artifact() {
+                            // Ensure images list is loaded for metadata
+                            if matches!(self.images.get(), LoadState::NotStarted) {
+                                self.load_image_list(ctx);
+                            }
+
                             // Artifact detail view
                             let artifact = match &self.artifacts.state {
                                 LoadState::Loaded(artifacts) => {
@@ -1061,6 +1066,11 @@ impl eframe::App for FamilyPhotosApp {
 
                                 if matches!(self.artifacts.get(), LoadState::NotStarted) {
                                     self.load_artifacts(ctx);
+                                }
+
+                                // Also load images list to get rotation metadata
+                                if matches!(self.images.get(), LoadState::NotStarted) {
+                                    self.load_image_list(ctx);
                                 }
 
                                 match self.artifacts.get().clone() {
