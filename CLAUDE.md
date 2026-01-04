@@ -37,6 +37,8 @@ This is a Cargo workspace with 4 crates:
    - Used by both worker and frontend to ensure type consistency
 
 4. **`scripts/`** - Admin utilities
+   - `add_images_to_history.rs`: Scans a directory and adds image entries to `history.toml`
+   - `generate_artifacts.rs`: Creates artifact entries from FastFoto filename patterns
    - `generate_thumbnails.rs`: Pre-generates thumbnails for R2 images locally
    - `list_r2_files.rs`: Lists files in R2 buckets
    - Uses AWS SDK for S3-compatible operations with Cloudflare R2
@@ -45,7 +47,7 @@ This is a Cargo workspace with 4 crates:
 
 1. **Image Metadata Source**: `data/history.toml` contains:
    - List of images with their R2 keys and optional rotation metadata
-   - List of artifacts (front/back image pairs for scanned documents)
+   - List of artifacts with `front1` (required), `front2` (optional), and `back1` (optional) images
 
 2. **Development vs Production**:
    - **Debug builds**: Bundle `history.toml` directly into the worker binary
@@ -100,6 +102,9 @@ cd scripts
 # Add all images from a directory to history.toml
 # Run without arguments to see all options (base path stripping, prefix, etc.)
 cargo run --bin add_images_to_history /path/to/images
+
+# Generate artifacts from FastFoto image patterns
+cargo run --bin generate_artifacts
 
 # Generate thumbnails locally
 cargo run --bin generate_thumbnails

@@ -21,6 +21,9 @@ pub struct HealthResponse {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ArtifactImages {
     pub front1: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub front2: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub back1: Option<String>,
 }
 

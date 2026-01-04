@@ -2338,10 +2338,12 @@ dependencies = [
  "dotenv",
  "image",
  "rand 0.8.5",
+ "regex",
  "serde",
  "serde_json",
  "tokio",
  "toml",
+ "toml_edit",
  "walkdir",
 ]
 
