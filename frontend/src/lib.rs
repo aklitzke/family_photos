@@ -203,8 +203,8 @@ struct FamilyPhotosApp {
 
 impl FamilyPhotosApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        Self {
-            current_page: Page::Images,
+        let mut app = Self {
+            current_page: Page::Artifacts,
             images: AsyncResource::new(),
             artifacts: AsyncResource::new(),
             thumbnails: HashMap::new(),
@@ -217,7 +217,87 @@ impl FamilyPhotosApp {
             full_image_failures: HashMap::new(),
             zoom_controller: ZoomController::new(),
             health: AsyncResource::new(),
+        };
+
+        // Parse initial URL to set state
+        app.parse_url();
+
+        // Update URL to reflect the actual page (e.g., "/" -> "/artifacts")
+        app.update_url();
+
+        app
+    }
+
+    fn parse_url(&mut self) {
+        let window = web_sys::window().unwrap();
+        let location = window.location();
+        let pathname = location.pathname().unwrap_or_default();
+
+        // Parse the path
+        let parts: Vec<&str> = pathname.trim_matches('/').split('/').collect();
+
+        match parts.get(0) {
+            Some(&"images") => {
+                self.current_page = Page::Images;
+                // Check for image key in query string
+                if let Ok(search) = location.search() {
+                    if let Some(key) = Self::parse_query_param(&search, "key") {
+                        self.selected_image = Some(key);
+                    }
+                }
+            }
+            Some(&"health") => {
+                self.current_page = Page::Health;
+            }
+            Some(&"artifacts") | Some(&"") | None => {
+                self.current_page = Page::Artifacts;
+                // Check if there's an artifact ID
+                if let Some(id_str) = parts.get(1) {
+                    if let Ok(id) = id_str.parse::<usize>() {
+                        self.selected_artifact = Some(id);
+                    }
+                }
+            }
+            _ => {
+                self.current_page = Page::Artifacts;
+            }
         }
+    }
+
+    fn parse_query_param(query: &str, param: &str) -> Option<String> {
+        for part in query.trim_start_matches('?').split('&') {
+            if let Some((key, value)) = part.split_once('=') {
+                if key == param {
+                    return urlencoding::decode(value).ok().map(|s| s.into_owned());
+                }
+            }
+        }
+        None
+    }
+
+    fn update_url(&self) {
+        let window = web_sys::window().unwrap();
+        let history = window.history().unwrap();
+
+        // Priority: selected_image > selected_artifact > current_page
+        let path = if let Some(key) = &self.selected_image {
+            format!("/images?key={}", urlencoding::encode(key))
+        } else {
+            match self.current_page {
+                Page::Images => "/images".to_string(),
+                Page::Artifacts => {
+                    if let Some(idx) = self.selected_artifact {
+                        format!("/artifacts/{}", idx)
+                    } else {
+                        "/artifacts".to_string()
+                    }
+                }
+                Page::Health => "/health".to_string(),
+            }
+        };
+
+        // Update URL without reloading the page
+        let _ = history.push_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&path));
     }
 
     fn load_image_list(&mut self, ctx: &egui::Context) {
@@ -486,6 +566,7 @@ impl FamilyPhotosApp {
     fn close_image_view(&mut self) {
         self.selected_image = None;
         self.zoom_controller.reset();
+        self.update_url();
     }
 
     fn render_sidebar(&mut self, ctx: &egui::Context) {
@@ -499,14 +580,19 @@ impl FamilyPhotosApp {
 
                 if ui.selectable_label(self.current_page == Page::Artifacts, "Artifacts").clicked() {
                     self.current_page = Page::Artifacts;
+                    self.selected_artifact = None;
+                    self.update_url();
                 }
 
                 if ui.selectable_label(self.current_page == Page::Images, "Images").clicked() {
                     self.current_page = Page::Images;
+                    self.selected_image = None;
+                    self.update_url();
                 }
 
                 if ui.selectable_label(self.current_page == Page::Health, "Health").clicked() {
                     self.current_page = Page::Health;
+                    self.update_url();
                 }
             });
     }
@@ -810,6 +896,7 @@ impl eframe::App for FamilyPhotosApp {
 
                                                     if clicked {
                                                         self.selected_image = Some(image_key.clone());
+                                                        self.update_url();
                                                     }
                                                 });
                                             }
@@ -840,6 +927,7 @@ impl eframe::App for FamilyPhotosApp {
                                 // Back button
                                 if ui.button(egui::RichText::new("← Back to Artifacts").size(18.0)).clicked() {
                                     self.selected_artifact = None;
+                                    self.update_url();
                                 }
 
                                 ui.add_space(20.0);
@@ -882,6 +970,7 @@ impl eframe::App for FamilyPhotosApp {
 
                                                     if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
                                                         self.selected_image = Some(artifact.images.front1.clone());
+                                                        self.update_url();
                                                     }
                                                 } else {
                                                     ui.label("Loading...");
@@ -901,6 +990,7 @@ impl eframe::App for FamilyPhotosApp {
 
                                                         if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
                                                             self.selected_image = Some(front2.clone());
+                                                            self.update_url();
                                                         }
                                                     } else {
                                                         ui.label("Loading...");
@@ -921,6 +1011,7 @@ impl eframe::App for FamilyPhotosApp {
 
                                                         if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
                                                             self.selected_image = Some(back1.clone());
+                                                            self.update_url();
                                                         }
                                                     } else {
                                                         ui.label("Loading...");
@@ -1099,6 +1190,7 @@ impl eframe::App for FamilyPhotosApp {
 
                                                         if clicked {
                                                             self.selected_artifact = Some(idx);
+                                                            self.update_url();
                                                         }
                                                     });
                                                 }
