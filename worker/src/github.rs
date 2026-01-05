@@ -28,14 +28,14 @@ struct GitHubUpdateRequest {
 #[cfg(not(use_local_history_file))]
 #[derive(Deserialize)]
 struct GitHubUpdateResponse {
-    content: GitHubContentInfo,
+    _content: GitHubContentInfo,
     commit: GitHubCommitInfo,
 }
 
 #[cfg(not(use_local_history_file))]
 #[derive(Deserialize)]
 struct GitHubContentInfo {
-    sha: String,
+    _sha: String,
 }
 
 #[cfg(not(use_local_history_file))]

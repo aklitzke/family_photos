@@ -7,8 +7,8 @@ use std::path::Path;
 
 #[derive(Debug)]
 struct FastFotoGroup {
-    base_path: String,
-    number: String,
+    _base_path: String,
+    _number: String,
     base: Option<String>,      // FastFoto_###.ext
     variant_a: Option<String>, // FastFoto_###_a.ext
     variant_b: Option<String>, // FastFoto_###_b.ext
@@ -51,8 +51,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some((base_path, number, variant)) = extract_fastfoto_info(&image.key) {
             let key = (base_path.clone(), number.clone());
             let group = groups.entry(key).or_insert_with(|| FastFotoGroup {
-                base_path: base_path.clone(),
-                number: number.clone(),
+                _base_path: base_path.clone(),
+                _number: number.clone(),
                 base: None,
                 variant_a: None,
                 variant_b: None,

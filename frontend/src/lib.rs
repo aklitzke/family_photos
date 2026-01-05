@@ -83,10 +83,6 @@ impl<T: Clone> AsyncResource<T> {
     fn get(&self) -> &LoadState<T> {
         &self.state
     }
-
-    fn get_mut(&mut self) -> &mut LoadState<T> {
-        &mut self.state
-    }
 }
 
 // Zoom controller for image viewing
@@ -343,34 +339,6 @@ impl FamilyPhotosApp {
         });
     }
 
-    fn load_thumbnail(&mut self, key: &str, ctx: &egui::Context) {
-        // Don't retry if already loaded, loading, or permanently failed
-        if self.thumbnails.contains_key(key)
-            || self.thumbnail_loading.contains_key(key)
-            || self.thumbnail_failures.contains_key(key) {
-            return;
-        }
-
-        let loading_state = Arc::new(Mutex::new(LoadState::Loading));
-        self.thumbnail_loading.insert(key.to_string(), loading_state.clone());
-
-        let key_encoded = urlencoding::encode(key).to_string();
-        let ctx_clone = ctx.clone();
-
-        wasm_bindgen_futures::spawn_local(async move {
-            match fetch_image(&format!("/api/images/thumbnail?key={}", key_encoded)).await {
-                Ok(image_data) => {
-                    *loading_state.lock().unwrap() = LoadState::Loaded(image_data);
-                    ctx_clone.request_repaint();
-                }
-                Err(e) => {
-                    *loading_state.lock().unwrap() = LoadState::Failed(e);
-                    ctx_clone.request_repaint();
-                }
-            }
-        });
-    }
-
     fn load_thumbnails_batch(&mut self, keys: Vec<String>, ctx: &egui::Context) {
         // Filter out keys that are already loaded, loading, or permanently failed
         let keys_to_load: Vec<String> = keys
@@ -612,7 +580,24 @@ impl FamilyPhotosApp {
 
     fn close_image_view(&mut self) {
         self.zoom_controller.reset();
-        self.navigate_to_page(self.get_current_page());
+        // Use browser back navigation to return to previous page
+        // If no history, fallback to images page
+        if let Some(window) = web_sys::window() {
+            if let Ok(history) = window.history() {
+                // Check if there's history to go back to
+                if let Ok(length) = history.length() {
+                    if length > 1 {
+                        let _ = history.back();
+                    } else {
+                        // No history, navigate to images page
+                        self.navigate_to_page(Page::Images);
+                    }
+                } else {
+                    // Can't determine length, try back anyway
+                    let _ = history.back();
+                }
+            }
+        }
     }
 
     fn render_sidebar(&mut self, ctx: &egui::Context) {
@@ -1473,22 +1458,6 @@ async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, Stri
     }
 
     serde_json::from_slice(&response.bytes).map_err(|e| format!("JSON parse error: {}", e))
-}
-
-async fn fetch_image(url: &str) -> Result<Vec<u8>, String> {
-    let full_url = format!("{}{}", API_BASE_URL, url);
-    let response = ehttp::fetch_async(ehttp::Request::get(&full_url))
-        .await
-        .map_err(|e| format!("Fetch failed: {}", e))?;
-
-    if !response.ok {
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
-    }
-
-    Ok(response.bytes)
 }
 
 async fn fetch_image_from_url(url: &str) -> Result<Vec<u8>, String> {
