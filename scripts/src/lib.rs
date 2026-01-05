@@ -107,24 +107,8 @@ pub fn read_history() -> Result<HistoryData, Box<dyn Error>> {
 }
 
 pub fn write_history(data: &HistoryData) -> Result<(), Box<dyn Error>> {
-    use toml_edit::DocumentMut;
-
-    // First serialize to TOML string, then parse with toml_edit for formatting control
-    let toml_string = toml::to_string_pretty(data)?;
-    let mut doc = toml_string.parse::<DocumentMut>()?;
-
-    // Convert artifacts array to use dotted keys for images
-    if let Some(artifacts_array) = doc.get_mut("artifacts").and_then(|item| item.as_array_of_tables_mut()) {
-        for artifact in artifacts_array.iter_mut() {
-            // Mark the images table as dotted to use dotted key notation
-            if let Some(images) = artifact.get_mut("images") {
-                if let Some(images_table) = images.as_table_like_mut() {
-                    images_table.set_dotted(true);
-                }
-            }
-        }
-    }
-
-    fs::write("../data/history.toml", doc.to_string())?;
+    // Use shared formatter from worker crate
+    let formatted = family_photos::format_history_toml(data)?;
+    fs::write("../data/history.toml", formatted)?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-use common::{Artifact, ArtifactListResponse, HealthResponse, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{Artifact, ArtifactListResponse, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, PresignedUrlResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -82,6 +82,10 @@ impl<T: Clone> AsyncResource<T> {
 
     fn get(&self) -> &LoadState<T> {
         &self.state
+    }
+
+    fn get_mut(&mut self) -> &mut LoadState<T> {
+        &mut self.state
     }
 }
 
@@ -192,10 +196,15 @@ struct FamilyPhotosApp {
     thumbnail_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     thumbnail_failures: HashMap<String, String>,  // Track permanent failures
     full_images: HashMap<String, TextureHandle>,
+    full_images_bytes: HashMap<String, Vec<u8>>,  // Cache raw bytes for rotation updates
     full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
     full_image_failures: HashMap<String, String>,  // Track permanent failures
     zoom_controller: ZoomController,
     health: AsyncResource<HealthResponse>,
+    rotation_updating: HashMap<String, bool>,  // Track images being rotated
+    rotation_promises: HashMap<String, Arc<Mutex<LoadState<RotateImageResponse>>>>,  // Track rotation update promises
+    toast_message: Option<(String, bool)>,     // (message, is_error)
+    toast_timer: f64,                          // Timer for toast auto-dismiss
 }
 
 impl FamilyPhotosApp {
@@ -217,10 +226,15 @@ impl FamilyPhotosApp {
             thumbnail_loading: HashMap::new(),
             thumbnail_failures: HashMap::new(),
             full_images: HashMap::new(),
+            full_images_bytes: HashMap::new(),
             full_images_loading: HashMap::new(),
             full_image_failures: HashMap::new(),
             zoom_controller: ZoomController::new(),
             health: AsyncResource::new(),
+            rotation_updating: HashMap::new(),
+            rotation_promises: HashMap::new(),
+            toast_message: None,
+            toast_timer: 0.0,
         }
     }
 
@@ -414,6 +428,29 @@ impl FamilyPhotosApp {
             return;
         }
 
+        // Check if we have cached bytes (from previous load) - if so, recreate texture from cache
+        // BUT only if images list is loaded - otherwise wait to ensure we have fresh metadata
+        if let Some(bytes) = self.full_images_bytes.get(key) {
+            if let LoadState::Loaded(images) = self.images.get() {
+                let rotation = images.iter()
+                    .find(|img| img.key == key)
+                    .and_then(|img| img.rotation);
+
+                if let Some(color_image) = load_image_from_bytes(bytes, rotation) {
+                    let texture = ctx.load_texture(
+                        format!("full_image_{}", key),
+                        color_image,
+                        Default::default(),
+                    );
+                    self.full_images.insert(key.to_string(), texture);
+                }
+                return;
+            }
+            // Images list not loaded yet - wait for it before recreating texture
+            // This ensures we use fresh rotation metadata after updates
+            return;
+        }
+
         let loading_state = Arc::new(Mutex::new(LoadState::Loading));
         self.full_images_loading.insert(key.to_string(), loading_state.clone());
 
@@ -499,6 +536,9 @@ impl FamilyPhotosApp {
             let state = loading_state.lock().unwrap();
             match &*state {
                 LoadState::Loaded(data) => {
+                    // Cache raw bytes for rotation updates
+                    self.full_images_bytes.insert(id.clone(), data.clone());
+
                     let rotation = rotation_map.get(id).and_then(|r| *r);
                     if let Some(color_image) = load_image_from_bytes(data, rotation) {
                         let texture = ctx.load_texture(
@@ -597,6 +637,87 @@ impl FamilyPhotosApp {
                 }
             });
     }
+
+    fn start_rotation_update(&mut self, image_key: String, new_rotation: u16) {
+        // Mark as updating
+        self.rotation_updating.insert(image_key.clone(), true);
+
+        // Create shared state for the async operation
+        let loading_state = Arc::new(Mutex::new(LoadState::Loading));
+        self.rotation_promises.insert(image_key.clone(), loading_state.clone());
+
+        // Spawn async task
+        let request = RotateImageRequest {
+            image_key: image_key.clone(),
+            new_rotation,
+        };
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = update_image_rotation(request).await;
+
+            let new_state = match result {
+                Ok(response) => LoadState::Loaded(response),
+                Err(error) => LoadState::Failed(error),
+            };
+
+            if let Ok(mut state) = loading_state.lock() {
+                *state = new_state;
+            }
+        });
+    }
+
+    fn process_rotation_updates(&mut self) {
+        // Collect completed updates
+        let mut completed_updates = Vec::new();
+
+        for (image_key, state_arc) in &self.rotation_promises {
+            if let Ok(state) = state_arc.lock() {
+                match &*state {
+                    LoadState::Loaded(response) => {
+                        completed_updates.push((image_key.clone(), Ok(response.clone())));
+                    }
+                    LoadState::Failed(error) => {
+                        completed_updates.push((image_key.clone(), Err(error.clone())));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Handle completed updates
+        for (image_key, result) in completed_updates {
+            self.rotation_promises.remove(&image_key);
+            self.rotation_updating.remove(&image_key);
+
+            match result {
+                Ok(response) => {
+                    // Show success toast
+                    self.toast_message = Some((
+                        format!("Rotation updated to {}°", response.new_rotation),
+                        false
+                    ));
+                    self.toast_timer = 0.0;
+
+                    // Reload images list from backend to get updated rotation metadata
+                    self.images = AsyncResource::new();
+
+                    // Clear texture so it gets recreated from cached bytes with new rotation
+                    self.full_images.remove(&image_key);
+
+                    // Clear thumbnail cache (cheaper to recreate)
+                    self.thumbnails.remove(&image_key);
+                }
+                Err(error) => {
+                    // Show error toast
+                    self.toast_message = Some((
+                        format!("Failed to update rotation: {}", error),
+                        true
+                    ));
+                    self.toast_timer = 0.0;
+                }
+            }
+        }
+    }
 }
 
 impl eframe::App for FamilyPhotosApp {
@@ -606,6 +727,80 @@ impl eframe::App for FamilyPhotosApp {
         self.process_loaded_thumbnails(ctx);
         self.process_loaded_full_images(ctx);
         self.health.process();
+        self.process_rotation_updates();
+
+        // Auto-load data based on current page/view
+        let current_page = self.get_current_page();
+        let viewing_image = self.get_selected_image().is_some();
+        let viewing_artifact_detail = self.get_selected_artifact().is_some();
+
+        match current_page {
+            Page::Images => {
+                // Images page always needs images list
+                if matches!(self.images.get(), LoadState::NotStarted) {
+                    self.load_image_list(ctx);
+                }
+            }
+            Page::Artifacts => {
+                // Artifacts page needs artifacts list
+                if matches!(self.artifacts.get(), LoadState::NotStarted) {
+                    self.load_artifacts(ctx);
+                }
+                // Artifact detail view needs images list for rotation metadata
+                if viewing_artifact_detail && matches!(self.images.get(), LoadState::NotStarted) {
+                    self.load_image_list(ctx);
+                }
+            }
+            Page::Health => {
+                if matches!(self.health.get(), LoadState::NotStarted) {
+                    self.load_health(ctx);
+                }
+            }
+        }
+
+        // Image overlay (can appear over any page) needs images list for rotation metadata
+        if viewing_image && matches!(self.images.get(), LoadState::NotStarted) {
+            self.load_image_list(ctx);
+        }
+
+        // Update toast timer
+        if self.toast_message.is_some() {
+            self.toast_timer += ctx.input(|i| i.stable_dt) as f64;
+            if self.toast_timer > 3.0 {
+                self.toast_message = None;
+                self.toast_timer = 0.0;
+            }
+        }
+
+        // Render toast notification
+        if let Some((message, is_error)) = &self.toast_message {
+            let content_rect = ctx.available_rect();
+            let toast_width = 400.0;
+            let toast_height = 60.0;
+            let toast_x = (content_rect.width() - toast_width) / 2.0;
+            let toast_y = 20.0;
+
+            egui::Window::new("toast")
+                .title_bar(false)
+                .resizable(false)
+                .fixed_pos([toast_x, toast_y])
+                .fixed_size([toast_width, toast_height])
+                .frame(egui::Frame::window(&ctx.style()).fill(
+                    if *is_error {
+                        egui::Color32::from_rgb(200, 50, 50)
+                    } else {
+                        egui::Color32::from_rgb(50, 150, 50)
+                    }
+                ))
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(10.0);
+                        ui.label(egui::RichText::new(message)
+                            .color(egui::Color32::WHITE)
+                            .size(16.0));
+                    });
+                });
+        }
 
         self.render_sidebar(ctx);
 
@@ -663,6 +858,45 @@ impl eframe::App for FamilyPhotosApp {
                             // Reset zoom button
                             if ui.button("Reset Zoom (100%)").clicked() {
                                 self.zoom_controller.reset();
+                            }
+
+                            ui.add_space(20.0);
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            // Rotation controls
+                            ui.heading("Rotation");
+
+                            // Get current rotation for this image
+                            let current_rotation = if let LoadState::Loaded(images) = self.images.get() {
+                                images.iter()
+                                    .find(|img| img.key == selected_id)
+                                    .and_then(|img| img.rotation)
+                                    .unwrap_or(0)
+                            } else {
+                                0
+                            };
+
+                            let is_updating = self.rotation_updating.get(&selected_id).copied().unwrap_or(false);
+
+                            ui.add_enabled_ui(!is_updating, |ui| {
+                                if ui.button("90°").clicked() {
+                                    let new_rotation = (current_rotation + 90) % 360;
+                                    self.start_rotation_update(selected_id.clone(), new_rotation);
+                                }
+                                if ui.button("180°").clicked() {
+                                    let new_rotation = (current_rotation + 180) % 360;
+                                    self.start_rotation_update(selected_id.clone(), new_rotation);
+                                }
+                                if ui.button("270°").clicked() {
+                                    let new_rotation = (current_rotation + 270) % 360;
+                                    self.start_rotation_update(selected_id.clone(), new_rotation);
+                                }
+                            });
+
+                            if is_updating {
+                                ui.spinner();
+                                ui.label("Updating...");
                             }
 
                             ui.add_space(20.0);
@@ -767,10 +1001,6 @@ impl eframe::App for FamilyPhotosApp {
                             ui.label(egui::RichText::new("Click a photo to view full size").size(16.0));
 
                             ui.add_space(30.0);
-
-                            if matches!(self.images.get(), LoadState::NotStarted) {
-                                self.load_image_list(ctx);
-                            }
 
                             match self.images.get().clone() {
                                 LoadState::Loading => {
@@ -909,11 +1139,6 @@ impl eframe::App for FamilyPhotosApp {
                     Page::Artifacts => {
                         // Check if we're viewing artifact detail (parse from URL)
                         if let Some(artifact_idx) = self.get_selected_artifact() {
-                            // Ensure images list is loaded for metadata
-                            if matches!(self.images.get(), LoadState::NotStarted) {
-                                self.load_image_list(ctx);
-                            }
-
                             // Artifact detail view
                             let artifact = match &self.artifacts.state {
                                 LoadState::Loaded(artifacts) => {
@@ -1063,15 +1288,6 @@ impl eframe::App for FamilyPhotosApp {
                                 ui.add_space(10.0);
                                 ui.label(egui::RichText::new("Click an artifact to view details").size(16.0));
                                 ui.add_space(30.0);
-
-                                if matches!(self.artifacts.get(), LoadState::NotStarted) {
-                                    self.load_artifacts(ctx);
-                                }
-
-                                // Also load images list to get rotation metadata
-                                if matches!(self.images.get(), LoadState::NotStarted) {
-                                    self.load_image_list(ctx);
-                                }
 
                                 match self.artifacts.get().clone() {
                                     LoadState::Loading => {
@@ -1317,6 +1533,36 @@ async fn fetch_thumbnails_batch(keys: &[String]) -> Result<HashMap<String, Vec<u
         .map_err(|e| format!("JSON parse error: {}", e))?;
 
     Ok(batch_response.thumbnails)
+}
+
+async fn update_image_rotation(request: RotateImageRequest) -> Result<RotateImageResponse, String> {
+    let full_url = format!("{}/api/images/rotate", API_BASE_URL);
+
+    let body_json = serde_json::to_string(&request)
+        .map_err(|e| format!("Failed to serialize request: {}", e))?;
+
+    let mut http_request = ehttp::Request::post(full_url, body_json.into_bytes());
+    http_request.headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+    let response = ehttp::fetch_async(http_request)
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.ok {
+        // Try to parse error response
+        if let Ok(error_response) = serde_json::from_slice::<ErrorResponse>(&response.bytes) {
+            return Err(format!("{}", error_response.error));
+        }
+        return Err(format!(
+            "HTTP error: {} {}",
+            response.status, response.status_text
+        ));
+    }
+
+    let rotate_response: RotateImageResponse = serde_json::from_slice(&response.bytes)
+        .map_err(|e| format!("JSON parse error: {}", e))?;
+
+    Ok(rotate_response)
 }
 
 fn load_image_from_bytes(bytes: &[u8], rotation: Option<u16>) -> Option<ColorImage> {

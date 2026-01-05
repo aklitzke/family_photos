@@ -23,7 +23,13 @@ head_sampling_rate = 1
 invocation_logs = true
 persist = true
 
-# Development environment - builds in debug mode to use bundled history.toml
+# GitHub API access token (required for updating history.toml in production)
+# To set: wrangler secret put GITHUB_TOKEN
+# Generate a personal access token at: https://github.com/settings/tokens
+# Required scopes: repo (for private repos) or public_repo (for public repos)
+# Note: Not needed for local dev builds (use_local_history_file flag is auto-enabled in debug)
+
+# Development environment - automatically uses bundled history.toml via use_local_history_file cfg
 [env.dev]
 [env.dev.build]
 command = "cargo install -q worker-build && worker-build --dev"

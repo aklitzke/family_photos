@@ -1,30 +1,20 @@
+mod github;
 mod sigv4;
 
-use common::{ArtifactListResponse, HealthResponse, HistoryData, ImageListResponse, ImageMetadata, PresignedUrlResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{
+    ArtifactListResponse, ErrorResponse, HealthResponse, HistoryData, ImageListResponse,
+    ImageMetadata, PresignedUrlResponse, RotateImageRequest, RotateImageResponse,
+    ThumbnailBatchRequest, ThumbnailBatchResponse,
+};
+use github::{fetch_history_with_sha, update_github_file};
 use sigv4::generate_r2_presigned_url;
 use std::collections::HashMap;
 use worker::*;
 
-#[cfg(not(debug_assertions))]
-use base64::{engine::general_purpose::STANDARD, Engine};
-#[cfg(not(debug_assertions))]
-use serde::Deserialize;
-
-#[cfg(not(debug_assertions))]
-const GITHUB_API_URL: &str =
-    "https://api.github.com/repos/aklitzke/family_photos/contents/data/history.toml";
-#[cfg(not(debug_assertions))]
+#[cfg(not(use_local_history_file))]
 const MAX_RETRIES: u32 = 3;
 
-#[cfg(not(debug_assertions))]
-#[derive(Deserialize)]
-struct GitHubContentsResponse {
-    content: String,
-    #[allow(dead_code)] // Will be used for future write operations
-    sha: String,
-}
-
-#[cfg(not(debug_assertions))]
+#[cfg(not(use_local_history_file))]
 async fn fetch_images_with_retry(env: &Env) -> Result<Vec<ImageMetadata>> {
     for attempt in 1..=MAX_RETRIES {
         match fetch_images(env).await {
@@ -39,68 +29,48 @@ async fn fetch_images_with_retry(env: &Env) -> Result<Vec<ImageMetadata>> {
     unreachable!()
 }
 
-#[cfg(debug_assertions)]
+#[cfg(use_local_history_file)]
 async fn fetch_images_with_retry(env: &Env) -> Result<Vec<ImageMetadata>> {
     fetch_images(env).await
 }
 
-async fn fetch_history_data(_env: &Env) -> Result<HistoryData> {
-    // In debug builds (local dev), use bundled history.toml
-    #[cfg(debug_assertions)]
-    {
-        console_log!("Using bundled history.toml from local file (debug mode)");
-        const HISTORY_TOML_CONTENT: &str = include_str!("../../data/history.toml");
-        let data: HistoryData = toml::from_str(HISTORY_TOML_CONTENT)
-            .map_err(|e| format!("Failed to parse bundled TOML: {}", e))?;
-        return Ok(data);
-    }
-
-    // In release builds (production), fetch from GitHub
-    #[cfg(not(debug_assertions))]
-    {
-        console_log!("Fetching history.toml from GitHub API");
-    let mut request = Request::new(GITHUB_API_URL, Method::Get)?;
-
-    // GitHub API requires User-Agent header
-    let headers = request.headers_mut()?;
-    headers.set("User-Agent", "family-photos-worker")?;
-    headers.set("Accept", "application/vnd.github.v3+json")?;
-
-    let mut response = Fetch::Request(request).send().await?;
-
-    let status = response.status_code();
-    if !(200..300).contains(&status) {
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("GitHub API error {}: {}", status, body).into());
-    }
-
-    let github_response: GitHubContentsResponse = response.json().await?;
-
-    // Decode base64 content (GitHub returns it with newlines, so remove whitespace first)
-    let cleaned_content: String = github_response
-        .content
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
-
-    let decoded = STANDARD
-        .decode(&cleaned_content)
-        .map_err(|e| format!("Failed to decode base64: {}", e))?;
-
-    let toml_content =
-        String::from_utf8(decoded).map_err(|e| format!("Invalid UTF-8 in file content: {}", e))?;
-
-    // Parse TOML
-    let data: HistoryData =
-        toml::from_str(&toml_content).map_err(|e| format!("Failed to parse TOML: {}", e))?;
-
+async fn fetch_history_data(env: &Env) -> Result<HistoryData> {
+    // Use the github module function and ignore the SHA
+    let (data, _sha) = fetch_history_with_sha(env).await?;
     Ok(data)
-    }
 }
 
 async fn fetch_images(env: &Env) -> Result<Vec<ImageMetadata>> {
     let data = fetch_history_data(env).await?;
     Ok(data.images)
+}
+
+/// Formats HistoryData to TOML string with proper formatting
+/// - Uses dotted key notation for artifact images (e.g., images.front1 = "...")
+/// - Preserves consistent formatting across all tools
+pub fn format_history_toml(data: &HistoryData) -> Result<String, String> {
+    use toml_edit::DocumentMut;
+
+    // First serialize to TOML string, then parse with toml_edit for formatting control
+    let toml_string = toml::to_string_pretty(data)
+        .map_err(|e| format!("Failed to serialize to TOML: {}", e))?;
+
+    let mut doc = toml_string.parse::<DocumentMut>()
+        .map_err(|e| format!("Failed to parse TOML document: {}", e))?;
+
+    // Convert artifacts array to use dotted keys for images
+    if let Some(artifacts_array) = doc.get_mut("artifacts").and_then(|item| item.as_array_of_tables_mut()) {
+        for artifact in artifacts_array.iter_mut() {
+            // Mark the images table as dotted to use dotted key notation
+            if let Some(images) = artifact.get_mut("images") {
+                if let Some(images_table) = images.as_table_like_mut() {
+                    images_table.set_dotted(true);
+                }
+            }
+        }
+    }
+
+    Ok(doc.to_string())
 }
 
 #[event(fetch)]
@@ -115,6 +85,9 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     router
         .options("/api/images/thumbnails", |_req, _ctx| {
+            Response::empty()
+        })
+        .options("/api/images/rotate", |_req, _ctx| {
             Response::empty()
         })
         .get_async("/api/health", |_req, _ctx| async move {
@@ -287,6 +260,119 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             )?;
 
             Response::from_json(&PresignedUrlResponse { url: presigned_url })
+        })
+        .post_async("/api/images/rotate", |mut req, ctx| async move {
+            // Parse request body
+            let request: RotateImageRequest = match req.json().await {
+                Ok(r) => r,
+                Err(e) => {
+                    return Response::from_json(&ErrorResponse {
+                        error: format!("Invalid request body: {}", e),
+                        error_type: "validation".to_string(),
+                    })
+                    .map(|r| r.with_status(400));
+                }
+            };
+
+            // Validate rotation value
+            if ![0, 90, 180, 270].contains(&request.new_rotation) {
+                return Response::from_json(&ErrorResponse {
+                    error: "Invalid rotation value. Must be 0, 90, 180, or 270".to_string(),
+                    error_type: "validation".to_string(),
+                })
+                .map(|r| r.with_status(400));
+            }
+
+            // Fetch current history with SHA
+            let (mut history_data, sha) = match fetch_history_with_sha(&ctx.env).await {
+                Ok(data) => data,
+                Err(e) => {
+                    return Response::from_json(&ErrorResponse {
+                        error: format!("Failed to fetch history data: {}", e),
+                        error_type: "github_api".to_string(),
+                    })
+                    .map(|r| r.with_status(500));
+                }
+            };
+
+            // Find the image and update rotation
+            let mut found = false;
+            let mut old_rotation = None;
+
+            // TODO convert to iterator
+            // TODO only do a write if the rotation has changed
+            for image in &mut history_data.images {
+                if image.key == request.image_key {
+                    found = true;
+                    old_rotation = image.rotation;
+
+                    // Update rotation (set to None if 0, otherwise set value)
+                    image.rotation = if request.new_rotation == 0 {
+                        None
+                    } else {
+                        Some(request.new_rotation)
+                    };
+                    break;
+                }
+            }
+
+            if !found {
+                return Response::from_json(&ErrorResponse {
+                    error: format!("Image not found: {}", request.image_key),
+                    error_type: "validation".to_string(),
+                })
+                .map(|r| r.with_status(404));
+            }
+
+            // Serialize updated history to TOML with proper formatting
+            let toml_content = match format_history_toml(&history_data) {
+                Ok(content) => content,
+                Err(e) => {
+                    return Response::from_json(&ErrorResponse {
+                        error: format!("Failed to serialize TOML: {}", e),
+                        error_type: "internal".to_string(),
+                    })
+                    .map(|r| r.with_status(500));
+                }
+            };
+
+            // Create commit message
+            let old_rotation_str = old_rotation
+                .map(|r| format!("{}°", r))
+                .unwrap_or_else(|| "0°".to_string());
+            let new_rotation_str = if request.new_rotation == 0 {
+                "0°".to_string()
+            } else {
+                format!("{}°", request.new_rotation)
+            };
+
+            let commit_message = format!(
+                "Autoupdate: <user> Updated {} rotation: {} → {}",
+                request.image_key, old_rotation_str, new_rotation_str
+            );
+
+            // Update GitHub file with optimistic locking
+            match update_github_file(&ctx.env, &toml_content, &sha, &commit_message).await {
+                Ok(_commit_sha) => {
+                    console_log!("Successfully updated rotation for {}", request.image_key);
+                    Response::from_json(&RotateImageResponse {
+                        success: true,
+                        old_rotation,
+                        new_rotation: request.new_rotation,
+                    })
+                }
+                Err(e) if e.to_string().contains("Conflict") => Response::from_json(&ErrorResponse {
+                    error: "The file was modified by another user. Please refresh and try again."
+                        .to_string(),
+                    error_type: "conflict".to_string(),
+                })
+                .map(|r| r.with_status(409)),
+                Err(e) => Response::from_json(&ErrorResponse {
+                    error: format!("Failed to update GitHub: {}", e),
+                    error_type: "github_api".to_string(),
+                })
+                .map(|r| r.with_status(500)),
+            }
         })
         .run(req, env.clone())
         .await?

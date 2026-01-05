@@ -58,3 +58,22 @@ pub struct ThumbnailBatchResponse {
 pub struct PresignedUrlResponse {
     pub url: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct RotateImageRequest {
+    pub image_key: String,
+    pub new_rotation: u16,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RotateImageResponse {
+    pub success: bool,
+    pub old_rotation: Option<u16>,
+    pub new_rotation: u16,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: String,
+    pub error_type: String,
+}

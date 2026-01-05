@@ -18,6 +18,7 @@ serde_json = "1.0"
 dotenv = "0.15"
 rand = "0.8"
 common = { path = "../common" }
+family-photos = { path = "../worker" }
 walkdir = "2.4"
 image = "0.25"
 regex = "1.10"
