@@ -28,6 +28,7 @@ struct GitHubUpdateRequest {
 #[cfg(not(use_local_history_file))]
 #[derive(Deserialize)]
 struct GitHubUpdateResponse {
+    #[serde(rename = "content")]
     _content: GitHubContentInfo,
     commit: GitHubCommitInfo,
 }
@@ -35,6 +36,7 @@ struct GitHubUpdateResponse {
 #[cfg(not(use_local_history_file))]
 #[derive(Deserialize)]
 struct GitHubContentInfo {
+    #[serde(rename = "sha")]
     _sha: String,
 }
 
