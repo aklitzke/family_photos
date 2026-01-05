@@ -399,9 +399,11 @@ key = "Family History/Pile 21 Lakewood Box/FastFoto_0821_b.tif"
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0822.tif"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0822_b.tif"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0823.tif"
@@ -435,6 +437,7 @@ key = "Family History/Pile 21 Lakewood Box/FastFoto_0827_b.tif"
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0828.tif"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0828_b.tif"
