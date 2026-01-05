@@ -717,7 +717,6 @@ impl eframe::App for FamilyPhotosApp {
         // Auto-load data based on current page/view
         let current_page = self.get_current_page();
         let viewing_image = self.get_selected_image().is_some();
-        let viewing_artifact_detail = self.get_selected_artifact().is_some();
 
         match current_page {
             Page::Images => {
@@ -731,8 +730,8 @@ impl eframe::App for FamilyPhotosApp {
                 if matches!(self.artifacts.get(), LoadState::NotStarted) {
                     self.load_artifacts(ctx);
                 }
-                // Artifact detail view needs images list for rotation metadata
-                if viewing_artifact_detail && matches!(self.images.get(), LoadState::NotStarted) {
+                // Artifacts page (both list and detail) needs images list for rotation metadata
+                if matches!(self.images.get(), LoadState::NotStarted) {
                     self.load_image_list(ctx);
                 }
             }
