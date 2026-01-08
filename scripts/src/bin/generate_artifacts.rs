@@ -30,9 +30,31 @@ fn extract_fastfoto_info(key: &str) -> Option<(String, String, Option<char>)> {
     Some((parent.to_string(), number, variant))
 }
 
+fn is_timestamp_format(key: &str) -> bool {
+    // Check if the filename matches the timestamp format: YYYY-MM-DD-HH-MM-####.ext
+    let path = Path::new(key);
+    let filename = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+
+    let re = Regex::new(r"^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{4}$");
+    re.map(|r| r.is_match(filename)).unwrap_or(false)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Reading existing history.toml...");
     let mut history = read_history()?;
+
+    // Find the highest existing ID
+    let mut next_id = history
+        .artifacts
+        .iter()
+        .map(|a| a.id)
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    println!("Found {} existing artifacts in history.toml", history.artifacts.len());
+    println!("Next available ID: {}", next_id);
+    println!();
 
     // Build a set of existing artifact front1 keys to avoid duplicates
     let existing_artifact_keys: HashSet<String> = history
@@ -41,16 +63,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|artifact| artifact.images.front1.clone())
         .collect();
 
-    println!("Found {} existing artifacts in history.toml", existing_artifact_keys.len());
-    println!();
-
     // Group FastFoto images by their base path and number
-    let mut groups: HashMap<(String, String), FastFotoGroup> = HashMap::new();
+    let mut fastfoto_groups: HashMap<(String, String), FastFotoGroup> = HashMap::new();
+    let mut timestamp_images: Vec<String> = Vec::new();
 
     for image in &history.images {
         if let Some((base_path, number, variant)) = extract_fastfoto_info(&image.key) {
             let key = (base_path.clone(), number.clone());
-            let group = groups.entry(key).or_insert_with(|| FastFotoGroup {
+            let group = fastfoto_groups.entry(key).or_insert_with(|| FastFotoGroup {
                 _base_path: base_path.clone(),
                 _number: number.clone(),
                 base: None,
@@ -64,16 +84,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some('b') => group.variant_b = Some(image.key.clone()),
                 _ => {}
             }
+        } else if is_timestamp_format(&image.key) {
+            timestamp_images.push(image.key.clone());
         }
     }
 
-    println!("Found {} FastFoto groups", groups.len());
+    println!("Found {} FastFoto groups", fastfoto_groups.len());
+    println!("Found {} timestamp format images", timestamp_images.len());
     println!();
 
     let mut new_artifacts = Vec::new();
     let mut skipped_count = 0;
 
-    for ((base_path, number), group) in groups {
+    // Process FastFoto images
+    for ((base_path, number), group) in fastfoto_groups {
         // Determine the artifact configuration based on which variants exist
         let artifact = match (&group.variant_a, &group.base, &group.variant_b) {
             // Pattern 1: _a exists (with optional base as front2 and _b as back1)
@@ -91,11 +115,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     desc_parts.push(format!("back1=FastFoto_{}_b", number));
                 }
 
-                println!("  + Creating artifact: {} ({})",
+                println!("  + Creating artifact #{}: {} ({})",
+                         next_id,
                          if base_path.is_empty() { "root" } else { &base_path },
                          desc_parts.join(", "));
 
                 Artifact {
+                    id: next_id,
                     images: ArtifactImages {
                         front1: variant_a.clone(),
                         front2: base_opt.clone(),
@@ -117,10 +143,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     String::new()
                 };
 
-                println!("  + Creating artifact: {} (front1=FastFoto_{}{})",
+                println!("  + Creating artifact #{}: {} (front1=FastFoto_{}{})",
+                         next_id,
                          if base_path.is_empty() { "root" } else { &base_path }, number, back_desc);
 
                 Artifact {
+                    id: next_id,
                     images: ArtifactImages {
                         front1: base.clone(),
                         front2: None,
@@ -136,10 +164,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     continue;
                 }
 
-                println!("  + Creating artifact: {} (front1=FastFoto_{}_b [back used as front])",
+                println!("  + Creating artifact #{}: {} (front1=FastFoto_{}_b [back used as front])",
+                         next_id,
                          if base_path.is_empty() { "root" } else { &base_path }, number);
 
                 Artifact {
+                    id: next_id,
                     images: ArtifactImages {
                         front1: variant_b.clone(),
                         front2: None,
@@ -158,7 +188,34 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         };
 
+        next_id += 1;
         new_artifacts.push(artifact);
+    }
+
+    // Process timestamp format images
+    for timestamp_key in timestamp_images {
+        if existing_artifact_keys.contains(&timestamp_key) {
+            skipped_count += 1;
+            continue;
+        }
+
+        let path = Path::new(&timestamp_key);
+        let parent = path.parent().and_then(|p| p.to_str()).unwrap_or("root");
+        let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or(&timestamp_key);
+
+        println!("  + Creating artifact #{}: {} (front1={})",
+                 next_id, parent, filename);
+
+        new_artifacts.push(Artifact {
+            id: next_id,
+            images: ArtifactImages {
+                front1: timestamp_key,
+                front2: None,
+                back1: None,
+            },
+        });
+
+        next_id += 1;
     }
 
     println!();
