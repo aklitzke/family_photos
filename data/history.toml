@@ -417,6 +417,7 @@ key = "Family History/Pile 21 Lakewood Box/FastFoto_0801_b.tif"
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0802.tif"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0802_b.tif"
