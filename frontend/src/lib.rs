@@ -248,8 +248,8 @@ impl FamilyPhotosApp {
         None
     }
 
-    /// Get selected artifact index from URL (if on /artifacts/{id})
-    fn get_selected_artifact(&self) -> Option<usize> {
+    /// Get selected artifact ID from URL (if on /artifacts/{id})
+    fn get_selected_artifact(&self) -> Option<u32> {
         let window = web_sys::window()?;
         let location = window.location();
         let pathname = location.pathname().ok()?;
@@ -297,11 +297,11 @@ impl FamilyPhotosApp {
         let _ = history.push_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&path));
     }
 
-    /// Navigate to a specific artifact
-    fn navigate_to_artifact(&self, idx: usize) {
+    /// Navigate to a specific artifact by ID
+    fn navigate_to_artifact(&self, id: u32) {
         let window = web_sys::window().unwrap();
         let history = window.history().unwrap();
-        let path = format!("/artifacts/{}", idx);
+        let path = format!("/artifacts/{}", id);
         let _ = history.push_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&path));
     }
 
@@ -1122,15 +1122,11 @@ impl eframe::App for FamilyPhotosApp {
                     }
                     Page::Artifacts => {
                         // Check if we're viewing artifact detail (parse from URL)
-                        if let Some(artifact_idx) = self.get_selected_artifact() {
+                        if let Some(artifact_id) = self.get_selected_artifact() {
                             // Artifact detail view
                             let artifact = match &self.artifacts.state {
                                 LoadState::Loaded(artifacts) => {
-                                    if artifact_idx < artifacts.len() {
-                                        Some(artifacts[artifact_idx].clone())
-                                    } else {
-                                        None
-                                    }
+                                    artifacts.iter().find(|a| a.id == artifact_id).cloned()
                                 }
                                 _ => None,
                             };
@@ -1149,7 +1145,7 @@ impl eframe::App for FamilyPhotosApp {
                                 ui.horizontal(|ui| {
                                     // Left side: Image grid
                                     ui.vertical(|ui| {
-                                        ui.heading(egui::RichText::new(format!("Artifact {}", artifact_idx + 1)).size(32.0));
+                                        ui.heading(egui::RichText::new(format!("Artifact #{}", artifact_id)).size(32.0));
                                         ui.add_space(20.0);
 
                                         // Collect all image keys
@@ -1320,9 +1316,10 @@ impl eframe::App for FamilyPhotosApp {
                                                 });
                                             })
                                             .body(|mut body| {
-                                                for (idx, artifact) in artifacts.iter().enumerate() {
+                                                for artifact in artifacts.iter() {
                                                     let front_key = &artifact.images.front1;
-                                                    let is_selected = self.get_selected_artifact() == Some(idx);
+                                                    let artifact_id = artifact.id;
+                                                    let is_selected = self.get_selected_artifact() == Some(artifact_id);
 
                                                     body.row(thumbnail_height, |mut row| {
                                                         row.set_selected(is_selected);
@@ -1356,7 +1353,7 @@ impl eframe::App for FamilyPhotosApp {
                                                                     let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
                                                                     let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
 
-                                                                    egui::Area::new(egui::Id::new(format!("hover_preview_artifact_{}", idx)))
+                                                                    egui::Area::new(egui::Id::new(format!("hover_preview_artifact_{}", artifact_id)))
                                                                         .fixed_pos(popup_pos)
                                                                         .order(egui::Order::Tooltip)
                                                                         .show(ui.ctx(), |ui| {
@@ -1395,7 +1392,7 @@ impl eframe::App for FamilyPhotosApp {
                                                         });
 
                                                         if clicked {
-                                                            self.navigate_to_artifact(idx);
+                                                            self.navigate_to_artifact(artifact_id);
                                                         }
                                                     });
                                                 }
