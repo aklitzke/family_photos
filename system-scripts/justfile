@@ -3,6 +3,7 @@ set script-interpreter := ["bash", "-euo", "pipefail"]
 dataset := "storage_rz2/family_history"
 mount := "/mnt/storage_rz2/family_history"
 scripts := justfile_directory() / ".." / "scripts"
+images := justfile_directory() / ".." / "images"
 
 # List available commands
 default:
@@ -32,4 +33,8 @@ lock-family-history:
 # Automatically generate thumbnails from original-size photos
 [working-directory: "../scripts"]
 generate-thumbnails:
-    cargo run --bin generate_thumbnails {{ mount }}/Family\ History/Klitzke\ Family\ Photos ../images/thumbs/Family\ History/
+    cargo run --bin generate_thumbnails {{ mount }}/Family\ History/Klitzke\ Family\ Photos {{ images}}/thumbs/Family\ History/
+
+# Generate compressed images (lossy JPEG + lossless PNG)
+generate-compressed:
+    ./compress-images.sh {{ mount }}/Family\ History/Klitzke\ Family\ Photos {{ images }}/15mb_max/Family\ History/ {{ images }}/lossless/Family\ History/
