@@ -1,0 +1,35 @@
+set script-interpreter := ["bash", "-euo", "pipefail"]
+
+dataset := "storage_rz2/family_history"
+mount := "/mnt/storage_rz2/family_history"
+scripts := justfile_directory() / ".." / "scripts"
+
+# List available commands
+default:
+    @just --list
+
+# Create a ZFS snapshot of family_history
+[script]
+snapshot-family-history:
+    snapshot_name="{{ dataset }}@$(date +%Y-%m-%d_%H%M%S)"
+    echo "Creating snapshot: $snapshot_name"
+    sudo zfs snapshot "$snapshot_name"
+    echo "Done."
+
+# Make files immutable and directories append-only
+[script]
+lock-family-history:
+    if [ ! -d "{{ mount }}" ]; then
+      echo "Error: {{ mount }} does not exist"
+      exit 1
+    fi
+    echo "Making all files immutable (+i)..."
+    sudo find "{{ mount }}" -type f -exec chattr +i {} +
+    echo "Making all directories append-only (+a)..."
+    sudo find "{{ mount }}" -type d -exec chattr +a {} +
+    echo "Done. Files: immutable, Directories: append-only."
+
+# Automatically generate thumbnails from original-size photos
+[working-directory: "../scripts"]
+generate-thumbnails:
+    cargo run --bin generate_thumbnails {{ mount }}/Family\ History/Klitzke\ Family\ Photos ../images/thumbs/Family\ History/
