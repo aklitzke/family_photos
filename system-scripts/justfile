@@ -38,3 +38,8 @@ generate-thumbnails:
 # Generate compressed images (lossy JPEG + lossless PNG)
 generate-compressed:
     ./compress-images.sh {{ mount }}/Family\ History/Klitzke\ Family\ Photos {{ images }}/15mb_max/Family\ History/ {{ images }}/lossless/Family\ History/
+
+# Deploy the current code to local compose server
+deploy:
+   cd ../frontend && trunk build --release
+   cd /home/andrew/server && docker compose up -d --build family-photos

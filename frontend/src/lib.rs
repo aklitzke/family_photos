@@ -1,4 +1,4 @@
-use common::{Artifact, ArtifactListResponse, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, PresignedUrlResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{Artifact, ArtifactListResponse, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -426,23 +426,13 @@ impl FamilyPhotosApp {
         let ctx_clone = ctx.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
-            // First, get the presigned URL from the API
-            match fetch_json::<PresignedUrlResponse>(&format!("/api/images/full?key={}", key_encoded)).await {
-                Ok(response) => {
-                    // Then fetch the actual image from the presigned URL
-                    match fetch_image_from_url(&response.url).await {
-                        Ok(image_data) => {
-                            *loading_state.lock().unwrap() = LoadState::Loaded(image_data);
-                            ctx_clone.request_repaint();
-                        }
-                        Err(e) => {
-                            *loading_state.lock().unwrap() = LoadState::Failed(format!("Failed to fetch image from R2: {}", e));
-                            ctx_clone.request_repaint();
-                        }
-                    }
+            match fetch_image_from_url(&format!("{}/api/images/full?key={}", API_BASE_URL, key_encoded)).await {
+                Ok(image_data) => {
+                    *loading_state.lock().unwrap() = LoadState::Loaded(image_data);
+                    ctx_clone.request_repaint();
                 }
                 Err(e) => {
-                    *loading_state.lock().unwrap() = LoadState::Failed(format!("Failed to get presigned URL: {}", e));
+                    *loading_state.lock().unwrap() = LoadState::Failed(format!("Failed to fetch image: {}", e));
                     ctx_clone.request_repaint();
                 }
             }
