@@ -11,17 +11,25 @@ use common::{
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Clone)]
 struct AppState {
-    history: Arc<RwLock<HistoryData>>,
     data_path: PathBuf,
     images_path: PathBuf,
     thumbs_path: PathBuf,
+    /// Serialize writes to history.toml so concurrent rotations don't race.
+    write_lock: std::sync::Arc<Mutex<()>>,
+}
+
+fn read_history(data_path: &Path) -> Result<HistoryData, String> {
+    let history_file = data_path.join("history.toml");
+    let content = std::fs::read_to_string(&history_file)
+        .map_err(|e| format!("Failed to read {}: {}", history_file.display(), e))?;
+    toml::from_str(&content)
+        .map_err(|e| format!("Failed to parse history.toml: {}", e))
 }
 
 #[tokio::main]
@@ -35,20 +43,18 @@ async fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(8082);
 
-    // Load history.toml at startup
-    let history_file = PathBuf::from(&data_path).join("history.toml");
-    let history_content = std::fs::read_to_string(&history_file)
-        .unwrap_or_else(|e| panic!("Failed to read {}: {}", history_file.display(), e));
-    let history: HistoryData = toml::from_str(&history_content)
-        .unwrap_or_else(|e| panic!("Failed to parse history.toml: {}", e));
-
-    eprintln!("Loaded {} images, {} artifacts from {}", history.images.len(), history.artifacts.len(), history_file.display());
+    // Validate history.toml is readable at startup
+    let data_path = PathBuf::from(&data_path);
+    let history = read_history(&data_path)
+        .unwrap_or_else(|e| panic!("{}", e));
+    eprintln!("Loaded {} images, {} artifacts from {}",
+        history.images.len(), history.artifacts.len(), data_path.join("history.toml").display());
 
     let state = AppState {
-        history: Arc::new(RwLock::new(history)),
-        data_path: PathBuf::from(&data_path),
+        data_path,
         images_path: PathBuf::from(&images_path),
         thumbs_path: PathBuf::from(&thumbs_path),
+        write_lock: std::sync::Arc::new(Mutex::new(())),
     };
 
     // Serve frontend static files with index.html fallback for SPA routing
@@ -82,18 +88,18 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
-async fn images_list(State(state): State<AppState>) -> Json<ImageListResponse> {
-    let history = state.history.read().await;
-    Json(ImageListResponse {
-        images: history.images.clone(),
-    })
+async fn images_list(State(state): State<AppState>) -> impl IntoResponse {
+    match read_history(&state.data_path) {
+        Ok(history) => Json(ImageListResponse { images: history.images }).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+    }
 }
 
-async fn artifacts_list(State(state): State<AppState>) -> Json<ArtifactListResponse> {
-    let history = state.history.read().await;
-    Json(ArtifactListResponse {
-        artifacts: history.artifacts.clone(),
-    })
+async fn artifacts_list(State(state): State<AppState>) -> impl IntoResponse {
+    match read_history(&state.data_path) {
+        Ok(history) => Json(ArtifactListResponse { artifacts: history.artifacts }).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -180,7 +186,20 @@ async fn rotate(
     State(state): State<AppState>,
     Json(request): Json<RotateImageRequest>,
 ) -> impl IntoResponse {
-    let mut history = state.history.write().await;
+    let _lock = state.write_lock.lock().await;
+
+    let mut history = match read_history(&state.data_path) {
+        Ok(h) => h,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: e,
+                    error_type: "read_error".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    };
 
     let idx = match history.images.iter().position(|img| img.key == request.image_key) {
         Some(i) => i,
@@ -196,19 +215,17 @@ async fn rotate(
     };
 
     let old_rotation = history.images[idx].rotation;
-    let new_rotation = if request.new_rotation == 0 {
+    history.images[idx].rotation = if request.new_rotation == 0 {
         None
     } else {
         Some(request.new_rotation)
     };
-    history.images[idx].rotation = new_rotation;
 
     // Write updated history to disk
     let history_file = state.data_path.join("history.toml");
     match common::format_history_toml(&history) {
         Ok(toml_str) => {
             if let Err(e) = tokio::fs::write(&history_file, &toml_str).await {
-                history.images[idx].rotation = old_rotation;
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::to_value(ErrorResponse {
@@ -219,7 +236,6 @@ async fn rotate(
             }
         }
         Err(e) => {
-            history.images[idx].rotation = old_rotation;
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::to_value(ErrorResponse {

@@ -201,6 +201,9 @@ struct FamilyPhotosApp {
     rotation_promises: HashMap<String, Arc<Mutex<LoadState<RotateImageResponse>>>>,  // Track rotation update promises
     toast_message: Option<(String, bool)>,     // (message, is_error)
     toast_timer: f64,                          // Timer for toast auto-dismiss
+    search_query: String,
+    images_visible_range: (usize, usize),      // (first, last) visible row indices
+    artifacts_visible_range: (usize, usize),   // (first, last) visible row indices
 }
 
 impl FamilyPhotosApp {
@@ -231,6 +234,9 @@ impl FamilyPhotosApp {
             rotation_promises: HashMap::new(),
             toast_message: None,
             toast_timer: 0.0,
+            search_query: String::new(),
+            images_visible_range: (0, 0),
+            artifacts_visible_range: (0, 0),
         }
     }
 
@@ -989,15 +995,61 @@ impl eframe::App for FamilyPhotosApp {
                                 LoadState::Loaded(images) => {
                                     let thumbnail_height = 80.0;
 
-                                    // Load thumbnails in batches to avoid overwhelming the server
-                                    let image_keys: Vec<String> = images.iter().map(|img| img.key.clone()).collect();
+                                    // Search bar
+                                    ui.horizontal(|ui| {
+                                        ui.label("Search:");
+                                        ui.add(egui::TextEdit::singleline(&mut self.search_query)
+                                            .hint_text("Filter by image key...")
+                                            .desired_width(400.0));
+                                        if !self.search_query.is_empty() {
+                                            if ui.button("Clear").clicked() {
+                                                self.search_query.clear();
+                                            }
+                                        }
+                                    });
+                                    ui.add_space(5.0);
 
-                                    // Split into chunks and load each batch
-                                    for chunk in image_keys.chunks(THUMBNAIL_BATCH_SIZE) {
-                                        self.load_thumbnails_batch(chunk.to_vec(), ctx);
+                                    // Filter images by search query
+                                    let filtered_images: Vec<&ImageMetadata> = if self.search_query.is_empty() {
+                                        images.iter().collect()
+                                    } else {
+                                        let query = self.search_query.to_lowercase();
+                                        images.iter()
+                                            .filter(|img| img.key.to_lowercase().contains(&query))
+                                            .collect()
+                                    };
+
+                                    if self.search_query.is_empty() {
+                                        ui.label(format!("{} images", filtered_images.len()));
+                                    } else {
+                                        ui.label(format!("{} of {} images", filtered_images.len(), images.len()));
+                                    }
+                                    ui.add_space(10.0);
+
+                                    // Load thumbnails only for visible rows + buffer of ~30 ahead
+                                    let total = filtered_images.len();
+                                    let (raw_vis_start, raw_vis_end) = self.images_visible_range;
+                                    let (load_start, load_end) = if raw_vis_end > raw_vis_start && raw_vis_start < total {
+                                        (raw_vis_start.saturating_sub(5), (raw_vis_end + 30).min(total))
+                                    } else {
+                                        (0, total.min(30))
+                                    };
+
+                                    if load_end > load_start {
+                                        let keys_to_load: Vec<String> = filtered_images[load_start..load_end]
+                                            .iter()
+                                            .map(|img| img.key.clone())
+                                            .collect();
+                                        for chunk in keys_to_load.chunks(THUMBNAIL_BATCH_SIZE) {
+                                            self.load_thumbnails_batch(chunk.to_vec(), ctx);
+                                        }
                                     }
 
                                     use egui_extras::{TableBuilder, Column};
+
+                                    let selected_key = self.get_selected_image();
+                                    let mut min_visible = usize::MAX;
+                                    let mut max_visible = 0usize;
 
                                     TableBuilder::new(ui)
                                         .striped(true)
@@ -1008,103 +1060,100 @@ impl eframe::App for FamilyPhotosApp {
                                         .column(Column::exact(100.0))
                                         .column(Column::exact(150.0))
                                         .header(30.0, |mut header| {
-                                            header.col(|ui| {
-                                                ui.strong("Thumbnail");
-                                            });
-                                            header.col(|ui| {
-                                                ui.strong("Key");
-                                            });
-                                            header.col(|ui| {
-                                                ui.strong("Date");
-                                            });
-                                            header.col(|ui| {
-                                                ui.strong("Size");
-                                            });
-                                            header.col(|ui| {
-                                                ui.strong("Tags");
-                                            });
+                                            header.col(|ui| { ui.strong("Thumbnail"); });
+                                            header.col(|ui| { ui.strong("Key"); });
+                                            header.col(|ui| { ui.strong("Date"); });
+                                            header.col(|ui| { ui.strong("Size"); });
+                                            header.col(|ui| { ui.strong("Tags"); });
                                         })
-                                        .body(|mut body| {
-                                            for image in &images {
+                                        .body(|body| {
+                                            body.rows(thumbnail_height, filtered_images.len(), |mut row| {
+                                                let idx = row.index();
+                                                let image = filtered_images[idx];
                                                 let image_key = image.key.clone();
-                                                let is_selected = self.get_selected_image().as_ref() == Some(&image_key);
+                                                let is_selected = selected_key.as_ref() == Some(&image_key);
+                                                row.set_selected(is_selected);
 
-                                                body.row(thumbnail_height, |mut row| {
-                                                    row.set_selected(is_selected);
+                                                min_visible = min_visible.min(idx);
+                                                max_visible = max_visible.max(idx);
 
-                                                    let mut clicked = false;
+                                                let mut clicked = false;
 
-                                                    row.col(|ui| {
-                                                        if let Some(texture) = self.thumbnails.get(&image.key) {
-                                                            let texture_size = texture.size_vec2();
-                                                            let aspect_ratio = texture_size.x / texture_size.y;
-                                                            let display_width = thumbnail_height * aspect_ratio;
-                                                            let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
+                                                row.col(|ui| {
+                                                    if let Some(texture) = self.thumbnails.get(&image.key) {
+                                                        let texture_size = texture.size_vec2();
+                                                        let aspect_ratio = texture_size.x / texture_size.y;
+                                                        let display_width = thumbnail_height * aspect_ratio;
+                                                        let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
 
-                                                            let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
+                                                        let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
 
-                                                            if response.clicked() {
-                                                                clicked = true;
-                                                            }
-
-                                                            if response.hovered() {
-                                                                let enlarged_height = 300.0;
-                                                                let enlarged_width = enlarged_height * aspect_ratio;
-                                                                let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
-
-                                                                let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
-                                                                let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
-
-                                                                egui::Area::new(egui::Id::new(format!("hover_preview_{}", image.key)))
-                                                                    .fixed_pos(popup_pos)
-                                                                    .order(egui::Order::Tooltip)
-                                                                    .show(ui.ctx(), |ui| {
-                                                                        egui::Frame::popup(ui.style())
-                                                                            .show(ui, |ui| {
-                                                                                ui.image((texture.id(), enlarged_size));
-                                                                            });
-                                                                    });
-                                                            }
-                                                        } else if let Some(err) = self.thumbnail_failures.get(&image.key) {
-                                                            ui.colored_label(
-                                                                egui::Color32::RED,
-                                                                format!("Error: {}", err)
-                                                            );
-                                                        } else {
-                                                            ui.label("Loading...");
-                                                        }
-                                                    });
-
-                                                    row.col(|ui| {
-                                                        if ui.button(&image.key).clicked() {
+                                                        if response.clicked() {
                                                             clicked = true;
                                                         }
-                                                    });
 
-                                                    row.col(|ui| {
-                                                        if ui.selectable_label(false, "—").clicked() {
-                                                            clicked = true;
+                                                        if response.hovered() {
+                                                            let enlarged_height = 300.0;
+                                                            let enlarged_width = enlarged_height * aspect_ratio;
+                                                            let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
+
+                                                            let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
+                                                            let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
+
+                                                            egui::Area::new(egui::Id::new(format!("hover_preview_{}", image.key)))
+                                                                .fixed_pos(popup_pos)
+                                                                .order(egui::Order::Tooltip)
+                                                                .show(ui.ctx(), |ui| {
+                                                                    egui::Frame::popup(ui.style())
+                                                                        .show(ui, |ui| {
+                                                                            ui.image((texture.id(), enlarged_size));
+                                                                        });
+                                                                });
                                                         }
-                                                    });
-
-                                                    row.col(|ui| {
-                                                        if ui.selectable_label(false, "—").clicked() {
-                                                            clicked = true;
-                                                        }
-                                                    });
-
-                                                    row.col(|ui| {
-                                                        if ui.selectable_label(false, "—").clicked() {
-                                                            clicked = true;
-                                                        }
-                                                    });
-
-                                                    if clicked {
-                                                        self.navigate_to_image(&image_key);
+                                                    } else if let Some(err) = self.thumbnail_failures.get(&image.key) {
+                                                        ui.colored_label(
+                                                            egui::Color32::RED,
+                                                            format!("Error: {}", err)
+                                                        );
+                                                    } else {
+                                                        ui.label("Loading...");
                                                     }
                                                 });
-                                            }
+
+                                                row.col(|ui| {
+                                                    if ui.button(&image.key).clicked() {
+                                                        clicked = true;
+                                                    }
+                                                });
+
+                                                row.col(|ui| {
+                                                    if ui.selectable_label(false, "—").clicked() {
+                                                        clicked = true;
+                                                    }
+                                                });
+
+                                                row.col(|ui| {
+                                                    if ui.selectable_label(false, "—").clicked() {
+                                                        clicked = true;
+                                                    }
+                                                });
+
+                                                row.col(|ui| {
+                                                    if ui.selectable_label(false, "—").clicked() {
+                                                        clicked = true;
+                                                    }
+                                                });
+
+                                                if clicked {
+                                                    self.navigate_to_image(&image_key);
+                                                }
+                                            });
                                         });
+
+                                    // Update visible range for next frame
+                                    if min_visible <= max_visible {
+                                        self.images_visible_range = (min_visible, max_visible);
+                                    }
                                 }
                                 LoadState::NotStarted => {}
                             }
@@ -1272,17 +1321,30 @@ impl eframe::App for FamilyPhotosApp {
                                     LoadState::Loaded(artifacts) => {
                                         let thumbnail_height = 80.0;
 
-                                        // Load front1 thumbnails in batches
-                                        let front_keys: Vec<String> = artifacts.iter()
-                                            .map(|artifact| artifact.images.front1.clone())
-                                            .collect();
+                                        // Load front1 thumbnails only for visible rows + buffer of ~30 ahead
+                                        let total = artifacts.len();
+                                        let (raw_vis_start, raw_vis_end) = self.artifacts_visible_range;
+                                        let (load_start, load_end) = if raw_vis_end > raw_vis_start && raw_vis_start < total {
+                                            (raw_vis_start.saturating_sub(5), (raw_vis_end + 30).min(total))
+                                        } else {
+                                            (0, total.min(30))
+                                        };
 
-                                        // Split into chunks and load each batch
-                                        for chunk in front_keys.chunks(THUMBNAIL_BATCH_SIZE) {
-                                            self.load_thumbnails_batch(chunk.to_vec(), ctx);
+                                        if load_end > load_start {
+                                            let keys_to_load: Vec<String> = artifacts[load_start..load_end]
+                                                .iter()
+                                                .map(|a| a.images.front1.clone())
+                                                .collect();
+                                            for chunk in keys_to_load.chunks(THUMBNAIL_BATCH_SIZE) {
+                                                self.load_thumbnails_batch(chunk.to_vec(), ctx);
+                                            }
                                         }
 
                                         use egui_extras::{TableBuilder, Column};
+
+                                        let selected_artifact = self.get_selected_artifact();
+                                        let mut min_visible = usize::MAX;
+                                        let mut max_visible = 0usize;
 
                                         TableBuilder::new(ui)
                                             .striped(true)
@@ -1292,101 +1354,99 @@ impl eframe::App for FamilyPhotosApp {
                                             .column(Column::exact(100.0))
                                             .column(Column::remainder().at_least(150.0))
                                             .header(30.0, |mut header| {
-                                                header.col(|ui| {
-                                                    ui.strong("Thumbnail");
-                                                });
-                                                header.col(|ui| {
-                                                    ui.strong("Date");
-                                                });
-                                                header.col(|ui| {
-                                                    ui.strong("Size");
-                                                });
-                                                header.col(|ui| {
-                                                    ui.strong("Tags");
-                                                });
+                                                header.col(|ui| { ui.strong("Thumbnail"); });
+                                                header.col(|ui| { ui.strong("Date"); });
+                                                header.col(|ui| { ui.strong("Size"); });
+                                                header.col(|ui| { ui.strong("Tags"); });
                                             })
-                                            .body(|mut body| {
-                                                for artifact in artifacts.iter() {
+                                            .body(|body| {
+                                                body.rows(thumbnail_height, artifacts.len(), |mut row| {
+                                                    let idx = row.index();
+                                                    let artifact = &artifacts[idx];
                                                     let front_key = &artifact.images.front1;
                                                     let artifact_id = artifact.id;
-                                                    let is_selected = self.get_selected_artifact() == Some(artifact_id);
+                                                    let is_selected = selected_artifact == Some(artifact_id);
+                                                    row.set_selected(is_selected);
 
-                                                    body.row(thumbnail_height, |mut row| {
-                                                        row.set_selected(is_selected);
+                                                    min_visible = min_visible.min(idx);
+                                                    max_visible = max_visible.max(idx);
 
-                                                        let mut clicked = false;
+                                                    let mut clicked = false;
 
-                                                        row.col(|ui| {
-                                                            if let Some(texture) = self.thumbnails.get(front_key) {
-                                                                let texture_size = texture.size_vec2();
+                                                    row.col(|ui| {
+                                                        if let Some(texture) = self.thumbnails.get(front_key) {
+                                                            let texture_size = texture.size_vec2();
 
-                                                                // Fit within bounds while maintaining aspect ratio
-                                                                let max_width = 90.0;
-                                                                let max_height = thumbnail_height;
-                                                                let scale_x = max_width / texture_size.x;
-                                                                let scale_y = max_height / texture_size.y;
-                                                                let scale = scale_x.min(scale_y);
-                                                                let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
+                                                            let max_width = 90.0;
+                                                            let max_height = thumbnail_height;
+                                                            let scale_x = max_width / texture_size.x;
+                                                            let scale_y = max_height / texture_size.y;
+                                                            let scale = scale_x.min(scale_y);
+                                                            let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
 
-                                                                let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
+                                                            let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
 
-                                                                if response.clicked() {
-                                                                    clicked = true;
-                                                                }
-
-                                                                if response.hovered() {
-                                                                    let aspect_ratio = texture_size.x / texture_size.y;
-                                                                    let enlarged_height = 300.0;
-                                                                    let enlarged_width = enlarged_height * aspect_ratio;
-                                                                    let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
-
-                                                                    let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
-                                                                    let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
-
-                                                                    egui::Area::new(egui::Id::new(format!("hover_preview_artifact_{}", artifact_id)))
-                                                                        .fixed_pos(popup_pos)
-                                                                        .order(egui::Order::Tooltip)
-                                                                        .show(ui.ctx(), |ui| {
-                                                                            egui::Frame::popup(ui.style())
-                                                                                .show(ui, |ui| {
-                                                                                    ui.image((texture.id(), enlarged_size));
-                                                                                });
-                                                                        });
-                                                                }
-                                                            } else if let Some(err) = self.thumbnail_failures.get(front_key) {
-                                                                ui.colored_label(
-                                                                    egui::Color32::RED,
-                                                                    format!("Error: {}", err)
-                                                                );
-                                                            } else {
-                                                                ui.label("Loading...");
-                                                            }
-                                                        });
-
-                                                        row.col(|ui| {
-                                                            if ui.selectable_label(false, "—").clicked() {
+                                                            if response.clicked() {
                                                                 clicked = true;
                                                             }
-                                                        });
 
-                                                        row.col(|ui| {
-                                                            if ui.selectable_label(false, "—").clicked() {
-                                                                clicked = true;
+                                                            if response.hovered() {
+                                                                let aspect_ratio = texture_size.x / texture_size.y;
+                                                                let enlarged_height = 300.0;
+                                                                let enlarged_width = enlarged_height * aspect_ratio;
+                                                                let enlarged_size = Vec2::new(enlarged_width, enlarged_height);
+
+                                                                let pointer_pos = ui.ctx().pointer_hover_pos().unwrap_or(response.rect.center());
+                                                                let popup_pos = pointer_pos + egui::vec2(10.0, 10.0);
+
+                                                                egui::Area::new(egui::Id::new(format!("hover_preview_artifact_{}", artifact_id)))
+                                                                    .fixed_pos(popup_pos)
+                                                                    .order(egui::Order::Tooltip)
+                                                                    .show(ui.ctx(), |ui| {
+                                                                        egui::Frame::popup(ui.style())
+                                                                            .show(ui, |ui| {
+                                                                                ui.image((texture.id(), enlarged_size));
+                                                                            });
+                                                                    });
                                                             }
-                                                        });
-
-                                                        row.col(|ui| {
-                                                            if ui.selectable_label(false, "—").clicked() {
-                                                                clicked = true;
-                                                            }
-                                                        });
-
-                                                        if clicked {
-                                                            self.navigate_to_artifact(artifact_id);
+                                                        } else if let Some(err) = self.thumbnail_failures.get(front_key) {
+                                                            ui.colored_label(
+                                                                egui::Color32::RED,
+                                                                format!("Error: {}", err)
+                                                            );
+                                                        } else {
+                                                            ui.label("Loading...");
                                                         }
                                                     });
-                                                }
+
+                                                    row.col(|ui| {
+                                                        if ui.selectable_label(false, "—").clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        if ui.selectable_label(false, "—").clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        if ui.selectable_label(false, "—").clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    if clicked {
+                                                        self.navigate_to_artifact(artifact_id);
+                                                    }
+                                                });
                                             });
+
+                                        // Update visible range for next frame
+                                        if min_visible <= max_visible {
+                                            self.artifacts_visible_range = (min_visible, max_visible);
+                                        }
                                     }
                                     LoadState::NotStarted => {}
                                 }

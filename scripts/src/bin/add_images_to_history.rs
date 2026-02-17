@@ -118,8 +118,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         };
 
-        // Apply prefix if provided
-        let key = format!("{}{}", prefix, relative_path);
+        // Strip file extension and apply prefix
+        let without_ext = Path::new(&relative_path).with_extension("");
+        let key = format!("{}{}", prefix, without_ext.to_string_lossy());
 
         // Check if this key already exists
         if existing_keys.contains(&key) {
