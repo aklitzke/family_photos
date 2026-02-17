@@ -15434,9 +15434,11 @@ key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0745_b"
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0746"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0746_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0747"
@@ -16872,6 +16874,7 @@ key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0844_b"
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0845"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0845_b"
@@ -17905,6 +17908,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_1016"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_1016_b"
@@ -18265,9 +18269,11 @@ key = "Family History/Pile 25 Upstairs Display/FastFoto_1086_b"
 
 [[images]]
 key = "Family History/Pile 25 Upstairs Display/FastFoto_1087"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 25 Upstairs Display/FastFoto_1087_b"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 25 Upstairs Display/FastFoto_1363"
