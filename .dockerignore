@@ -1,0 +1,6 @@
+images/
+.git/
+**/target/
+frontend/dist/
+system-scripts/
+scripts/

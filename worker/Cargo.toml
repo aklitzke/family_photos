@@ -3,22 +3,18 @@ name = "family-photos"
 version = "0.0.1"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+[[bin]]
+name = "family-photos"
+path = "src/main.rs"
 
 [dependencies]
-worker = "0.7.2"
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
-toml_edit = "0.22"
-base64 = "0.22"
-image = "0.25"
 common = { version = "0.1.0", path = "../common" }
-urlencoding = "2.1"
-hex = "0.4"
-hmac = "0.12"
-sha2 = "0.10"
 
 [profile.release]
 opt-level = "z"

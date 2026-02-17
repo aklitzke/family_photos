@@ -108,7 +108,7 @@ pub fn read_history() -> Result<HistoryData, Box<dyn Error>> {
 
 pub fn write_history(data: &HistoryData) -> Result<(), Box<dyn Error>> {
     // Use shared formatter from worker crate
-    let formatted = family_photos::format_history_toml(data)?;
+    let formatted = common::format_history_toml(data)?;
     fs::write("../data/history.toml", formatted)?;
     Ok(())
 }

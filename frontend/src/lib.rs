@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 const API_BASE_URL: &str = if cfg!(debug_assertions) {
-    "http://localhost:8787"
+    "http://localhost:8082"
 } else {
     ""
 };
