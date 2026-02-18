@@ -29,11 +29,26 @@ pub struct ArtifactImages {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Artifact {
-    pub id: u32,
+pub struct ArtifactUpdate {
+    pub author: String,
+    pub updated: String,
+    pub reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Artifact {
+    pub id: u32,
     pub images: ArtifactImages,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub updates: Vec<ArtifactUpdate>,
+}
+
+/// Returns the most recent date from an artifact's update history.
+pub fn artifact_date(artifact: &Artifact) -> Option<&str> {
+    artifact.updates.iter().rev()
+        .find_map(|u| u.date.as_deref())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -77,14 +92,16 @@ pub struct RotateImageResponse {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UpdateArtifactDateRequest {
+pub struct UpdateArtifactRequest {
     pub artifact_id: u32,
+    pub reason: String,
     pub date: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct UpdateArtifactDateResponse {
+pub struct UpdateArtifactResponse {
     pub success: bool,
+    pub update: ArtifactUpdate,
 }
 
 #[derive(Serialize, Deserialize)]

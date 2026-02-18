@@ -1,4 +1,4 @@
-use common::{Artifact, ArtifactListResponse, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactDateRequest, UpdateArtifactDateResponse};
+use common::{artifact_date, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -211,10 +211,11 @@ struct FamilyPhotosApp {
     search_query: String,
     images_visible_range: (usize, usize),      // (first, last) visible row indices
     artifacts_visible_range: (usize, usize),   // (first, last) visible row indices
-    date_edit_state: HashMap<u32, String>,      // In-progress date edits per artifact
-    date_updating: HashMap<u32, bool>,          // Track artifacts being date-updated
-    date_promises: HashMap<u32, Arc<Mutex<LoadState<UpdateArtifactDateResponse>>>>,
-    date_validation_error: HashMap<u32, String>, // Inline validation feedback
+    update_date_state: HashMap<u32, String>,      // In-progress date edits per artifact
+    update_reason_state: HashMap<u32, String>,   // In-progress reason edits per artifact
+    update_in_progress: HashMap<u32, bool>,      // Track artifacts being updated
+    update_promises: HashMap<u32, Arc<Mutex<LoadState<UpdateArtifactResponse>>>>,
+    update_validation_error: HashMap<u32, String>, // Inline validation feedback
 }
 
 impl FamilyPhotosApp {
@@ -248,10 +249,11 @@ impl FamilyPhotosApp {
             search_query: String::new(),
             images_visible_range: (0, 0),
             artifacts_visible_range: (0, 0),
-            date_edit_state: HashMap::new(),
-            date_updating: HashMap::new(),
-            date_promises: HashMap::new(),
-            date_validation_error: HashMap::new(),
+            update_date_state: HashMap::new(),
+            update_reason_state: HashMap::new(),
+            update_in_progress: HashMap::new(),
+            update_promises: HashMap::new(),
+            update_validation_error: HashMap::new(),
         }
     }
 
@@ -722,26 +724,32 @@ impl FamilyPhotosApp {
         }
     }
 
-    fn start_date_update(&mut self, artifact_id: u32, date: Option<String>) {
-        self.date_updating.insert(artifact_id, true);
+    fn start_artifact_update(&mut self, artifact_id: u32, reason: String, date: Option<String>) {
+        self.update_in_progress.insert(artifact_id, true);
 
-        // Update local artifact data immediately
+        // Optimistically update local artifact data
         if let LoadState::Loaded(artifacts) = &mut self.artifacts.state {
             if let Some(a) = artifacts.iter_mut().find(|a| a.id == artifact_id) {
-                a.date = date.clone();
+                a.updates.push(ArtifactUpdate {
+                    author: "andrew".to_string(),
+                    updated: String::new(),
+                    reason: reason.clone(),
+                    date: date.clone(),
+                });
             }
         }
 
         let loading_state = Arc::new(Mutex::new(LoadState::Loading));
-        self.date_promises.insert(artifact_id, loading_state.clone());
+        self.update_promises.insert(artifact_id, loading_state.clone());
 
-        let request = UpdateArtifactDateRequest {
+        let request = UpdateArtifactRequest {
             artifact_id,
+            reason,
             date,
         };
 
         wasm_bindgen_futures::spawn_local(async move {
-            let result = update_artifact_date(request).await;
+            let result = send_artifact_update(request).await;
             let new_state = match result {
                 Ok(response) => LoadState::Loaded(response),
                 Err(error) => LoadState::Failed(error),
@@ -752,10 +760,10 @@ impl FamilyPhotosApp {
         });
     }
 
-    fn process_date_updates(&mut self) {
+    fn process_artifact_updates(&mut self) {
         let mut completed = Vec::new();
 
-        for (artifact_id, state_arc) in &self.date_promises {
+        for (artifact_id, state_arc) in &self.update_promises {
             if let Ok(state) = state_arc.lock() {
                 match &*state {
                     LoadState::Loaded(response) => {
@@ -770,20 +778,34 @@ impl FamilyPhotosApp {
         }
 
         for (artifact_id, result) in completed {
-            self.date_promises.remove(&artifact_id);
-            self.date_updating.remove(&artifact_id);
+            self.update_promises.remove(&artifact_id);
+            self.update_in_progress.remove(&artifact_id);
 
             match result {
-                Ok(_) => {
-                    self.toast_message = Some(("Date updated".to_string(), false));
+                Ok(response) => {
+                    self.toast_message = Some(("Update saved".to_string(), false));
                     self.toast_timer = 0.0;
+                    // Replace optimistic update with server response
+                    if let LoadState::Loaded(artifacts) = &mut self.artifacts.state {
+                        if let Some(a) = artifacts.iter_mut().find(|a| a.id == artifact_id) {
+                            if let Some(last) = a.updates.last_mut() {
+                                *last = response.update;
+                            }
+                        }
+                    }
                 }
                 Err(error) => {
                     self.toast_message = Some((
-                        format!("Failed to update date: {}", error),
+                        format!("Failed to save update: {}", error),
                         true,
                     ));
                     self.toast_timer = 0.0;
+                    // Remove optimistic update
+                    if let LoadState::Loaded(artifacts) = &mut self.artifacts.state {
+                        if let Some(a) = artifacts.iter_mut().find(|a| a.id == artifact_id) {
+                            a.updates.pop();
+                        }
+                    }
                 }
             }
         }
@@ -913,7 +935,7 @@ impl eframe::App for FamilyPhotosApp {
         self.process_loaded_full_images(ctx);
         self.health.process();
         self.process_rotation_updates();
-        self.process_date_updates();
+        self.process_artifact_updates();
 
         // Auto-load data based on current page/view
         let current_page = self.get_current_page();
@@ -1478,31 +1500,55 @@ impl eframe::App for FamilyPhotosApp {
                                         ui.heading(egui::RichText::new("Attributes").size(24.0));
                                         ui.add_space(20.0);
 
-                                        // Date display and editing
+                                        // Date display
                                         ui.horizontal(|ui| {
                                             ui.label(egui::RichText::new("Date:").strong());
-                                            if let Some(date) = &artifact.date {
+                                            if let Some(date) = artifact_date(&artifact) {
                                                 ui.label(format_date_for_display(date));
                                             } else {
                                                 ui.label("—");
                                             }
                                         });
 
-                                        // Initialize edit state as empty (never pre-fill from saved date)
-                                        if !self.date_edit_state.contains_key(&artifact_id) {
-                                            self.date_edit_state.insert(artifact_id, String::new());
+                                        ui.add_space(10.0);
+                                        ui.separator();
+                                        ui.add_space(10.0);
+
+                                        // Update form
+                                        ui.label(egui::RichText::new("Log an update:").strong());
+                                        ui.add_space(5.0);
+
+                                        // Initialize edit states
+                                        if !self.update_date_state.contains_key(&artifact_id) {
+                                            self.update_date_state.insert(artifact_id, String::new());
+                                        }
+                                        if !self.update_reason_state.contains_key(&artifact_id) {
+                                            self.update_reason_state.insert(artifact_id, String::new());
                                         }
 
-                                        let is_updating = self.date_updating.get(&artifact_id).copied().unwrap_or(false);
+                                        let is_updating = self.update_in_progress.get(&artifact_id).copied().unwrap_or(false);
 
                                         let mut save_clicked = false;
-                                        let edit_text = self.date_edit_state.get_mut(&artifact_id).unwrap();
+                                        let date_text = self.update_date_state.get_mut(&artifact_id).unwrap();
+                                        let reason_text = self.update_reason_state.get_mut(&artifact_id).unwrap();
                                         ui.add_enabled_ui(!is_updating, |ui| {
-                                            ui.add(
-                                                egui::TextEdit::singleline(edit_text)
-                                                    .hint_text("e.g. 2020, 12/2020, 02/05/2020")
-                                                    .desired_width(200.0)
-                                            );
+                                            ui.horizontal(|ui| {
+                                                ui.label("Date:");
+                                                ui.add(
+                                                    egui::TextEdit::singleline(date_text)
+                                                        .hint_text("e.g. 2020, 12/2020, 02/05/2020")
+                                                        .desired_width(200.0)
+                                                );
+                                            });
+
+                                            ui.horizontal(|ui| {
+                                                ui.label("Reason:");
+                                                ui.add(
+                                                    egui::TextEdit::singleline(reason_text)
+                                                        .hint_text("Why are you making this change?")
+                                                        .desired_width(200.0)
+                                                );
+                                            });
 
                                             if ui.button("Save").clicked() {
                                                 save_clicked = true;
@@ -1510,16 +1556,26 @@ impl eframe::App for FamilyPhotosApp {
                                         });
 
                                         if save_clicked {
-                                            let input = self.date_edit_state.get(&artifact_id)
+                                            let date_input = self.update_date_state.get(&artifact_id)
                                                 .cloned().unwrap_or_default();
-                                            match parse_fuzzy_date(&input) {
-                                                Ok(parsed) => {
-                                                    self.date_validation_error.remove(&artifact_id);
-                                                    self.date_edit_state.remove(&artifact_id);
-                                                    self.start_date_update(artifact_id, parsed);
-                                                }
-                                                Err(msg) => {
-                                                    self.date_validation_error.insert(artifact_id, msg);
+                                            let reason_input = self.update_reason_state.get(&artifact_id)
+                                                .cloned().unwrap_or_default();
+
+                                            if date_input.trim().is_empty() {
+                                                self.update_validation_error.insert(artifact_id, "Date is required".to_string());
+                                            } else if reason_input.trim().is_empty() {
+                                                self.update_validation_error.insert(artifact_id, "Reason is required".to_string());
+                                            } else {
+                                                match parse_fuzzy_date(&date_input) {
+                                                    Ok(parsed_date) => {
+                                                        self.update_validation_error.remove(&artifact_id);
+                                                        self.update_date_state.remove(&artifact_id);
+                                                        self.update_reason_state.remove(&artifact_id);
+                                                        self.start_artifact_update(artifact_id, reason_input.trim().to_string(), parsed_date);
+                                                    }
+                                                    Err(msg) => {
+                                                        self.update_validation_error.insert(artifact_id, msg);
+                                                    }
                                                 }
                                             }
                                         }
@@ -1528,7 +1584,7 @@ impl eframe::App for FamilyPhotosApp {
                                             ui.spinner();
                                         }
 
-                                        if let Some(err) = self.date_validation_error.get(&artifact_id) {
+                                        if let Some(err) = self.update_validation_error.get(&artifact_id) {
                                             ui.colored_label(egui::Color32::RED, err);
                                         }
 
@@ -1674,8 +1730,8 @@ impl eframe::App for FamilyPhotosApp {
                                                     });
 
                                                     row.col(|ui| {
-                                                        let date_label = artifact.date.as_ref()
-                                                            .map(|d| format_date_for_display(d))
+                                                        let date_label = artifact_date(artifact)
+                                                            .map(format_date_for_display)
                                                             .unwrap_or_else(|| "—".to_string());
                                                         if ui.selectable_label(false, &date_label).clicked() {
                                                             clicked = true;
@@ -1837,8 +1893,8 @@ async fn update_image_rotation(request: RotateImageRequest) -> Result<RotateImag
     Ok(rotate_response)
 }
 
-async fn update_artifact_date(request: UpdateArtifactDateRequest) -> Result<UpdateArtifactDateResponse, String> {
-    let full_url = format!("{}/api/artifacts/update-date", API_BASE_URL);
+async fn send_artifact_update(request: UpdateArtifactRequest) -> Result<UpdateArtifactResponse, String> {
+    let full_url = format!("{}/api/artifacts/update", API_BASE_URL);
 
     let body_json = serde_json::to_string(&request)
         .map_err(|e| format!("Failed to serialize request: {}", e))?;

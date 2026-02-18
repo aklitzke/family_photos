@@ -6,9 +6,9 @@ use axum::{
     Router,
 };
 use common::{
-    ArtifactListResponse, ErrorResponse, HealthResponse, HistoryData, ImageListResponse,
-    RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse,
-    UpdateArtifactDateRequest, UpdateArtifactDateResponse,
+    ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, HistoryData,
+    ImageListResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest,
+    ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -71,7 +71,7 @@ async fn main() {
         .route("/api/images/thumbnails", post(thumbnails_batch))
         .route("/api/images/full", get(full_image))
         .route("/api/images/rotate", post(rotate))
-        .route("/api/artifacts/update-date", post(update_artifact_date))
+        .route("/api/artifacts/update", post(update_artifact))
         .with_state(state)
         .fallback_service(serve_frontend)
         .layer(CorsLayer::permissive());
@@ -275,10 +275,21 @@ fn is_valid_date_format(s: &str) -> bool {
     (1..=31).contains(&day)
 }
 
-async fn update_artifact_date(
+async fn update_artifact(
     State(state): State<AppState>,
-    Json(request): Json<UpdateArtifactDateRequest>,
+    Json(request): Json<UpdateArtifactRequest>,
 ) -> impl IntoResponse {
+    // Validate reason is non-empty
+    if request.reason.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::to_value(ErrorResponse {
+                error: "Reason is required".to_string(),
+                error_type: "validation_error".to_string(),
+            }).unwrap()),
+        ).into_response();
+    }
+
     // Validate date format if provided
     if let Some(ref date) = request.date {
         if !is_valid_date_format(date) {
@@ -320,7 +331,14 @@ async fn update_artifact_date(
         }
     };
 
-    history.artifacts[idx].date = request.date;
+    let update = ArtifactUpdate {
+        author: "andrew".to_string(),
+        updated: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        reason: request.reason,
+        date: request.date,
+    };
+
+    history.artifacts[idx].updates.push(update.clone());
 
     let history_file = state.data_path.join("history.toml");
     match common::format_history_toml(&history) {
@@ -348,8 +366,9 @@ async fn update_artifact_date(
 
     (
         StatusCode::OK,
-        Json(serde_json::to_value(UpdateArtifactDateResponse {
+        Json(serde_json::to_value(UpdateArtifactResponse {
             success: true,
+            update,
         }).unwrap()),
     ).into_response()
 }
