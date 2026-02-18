@@ -34,6 +34,14 @@ updated = "2026-02-18T03:07:30Z"
 reason = "that's the lakewood raft"
 tags = ["lakewood"]
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-18T03:21:35Z"
+reason = "water"
+tags = [
+    "lakewood",
+]
+
 [[artifacts]]
 id = 6
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0812"
@@ -105,6 +113,13 @@ images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0802_b"
 id = 16
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0828"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0828_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-18T03:24:25Z"
+reason = "printed on back, recognize dock. wonder if I caught a fish?"
+date = "1998"
+tags = ["lakewood"]
 
 [[artifacts]]
 id = 17
@@ -16808,6 +16823,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0828_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0829"
