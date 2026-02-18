@@ -8,6 +8,7 @@ use axum::{
 use common::{
     ArtifactListResponse, ErrorResponse, HealthResponse, HistoryData, ImageListResponse,
     RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse,
+    UpdateArtifactDateRequest, UpdateArtifactDateResponse,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -70,6 +71,7 @@ async fn main() {
         .route("/api/images/thumbnails", post(thumbnails_batch))
         .route("/api/images/full", get(full_image))
         .route("/api/images/rotate", post(rotate))
+        .route("/api/artifacts/update-date", post(update_artifact_date))
         .with_state(state)
         .fallback_service(serve_frontend)
         .layer(CorsLayer::permissive());
@@ -252,6 +254,102 @@ async fn rotate(
             success: true,
             old_rotation,
             new_rotation: request.new_rotation,
+        }).unwrap()),
+    ).into_response()
+}
+
+fn is_valid_date_format(s: &str) -> bool {
+    // Match YYYY, YYYY-MM, or YYYY-MM-DD
+    let bytes = s.as_bytes();
+    if bytes.len() < 4 { return false; }
+    if !bytes[0..4].iter().all(|b| b.is_ascii_digit()) { return false; }
+    if bytes.len() == 4 { return true; }
+    if bytes.len() < 7 || bytes[4] != b'-' { return false; }
+    if !bytes[5..7].iter().all(|b| b.is_ascii_digit()) { return false; }
+    let month: u8 = s[5..7].parse().unwrap_or(0);
+    if !(1..=12).contains(&month) { return false; }
+    if bytes.len() == 7 { return true; }
+    if bytes.len() != 10 || bytes[7] != b'-' { return false; }
+    if !bytes[8..10].iter().all(|b| b.is_ascii_digit()) { return false; }
+    let day: u8 = s[8..10].parse().unwrap_or(0);
+    (1..=31).contains(&day)
+}
+
+async fn update_artifact_date(
+    State(state): State<AppState>,
+    Json(request): Json<UpdateArtifactDateRequest>,
+) -> impl IntoResponse {
+    // Validate date format if provided
+    if let Some(ref date) = request.date {
+        if !is_valid_date_format(date) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: format!("Invalid date format: '{}'. Expected YYYY, YYYY-MM, or YYYY-MM-DD", date),
+                    error_type: "validation_error".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    }
+
+    let _lock = state.write_lock.lock().await;
+
+    let mut history = match read_history(&state.data_path) {
+        Ok(h) => h,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: e,
+                    error_type: "read_error".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    };
+
+    let idx = match history.artifacts.iter().position(|a| a.id == request.artifact_id) {
+        Some(i) => i,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: format!("Artifact not found: {}", request.artifact_id),
+                    error_type: "not_found".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    };
+
+    history.artifacts[idx].date = request.date;
+
+    let history_file = state.data_path.join("history.toml");
+    match common::format_history_toml(&history) {
+        Ok(toml_str) => {
+            if let Err(e) = tokio::fs::write(&history_file, &toml_str).await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::to_value(ErrorResponse {
+                        error: format!("Failed to write history.toml: {}", e),
+                        error_type: "io_error".to_string(),
+                    }).unwrap()),
+                ).into_response();
+            }
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: format!("Failed to format history.toml: {}", e),
+                    error_type: "format_error".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::to_value(UpdateArtifactDateResponse {
+            success: true,
         }).unwrap()),
     ).into_response()
 }

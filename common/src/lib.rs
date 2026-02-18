@@ -31,6 +31,8 @@ pub struct ArtifactImages {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Artifact {
     pub id: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
     pub images: ArtifactImages,
 }
 
@@ -72,6 +74,17 @@ pub struct RotateImageResponse {
     pub success: bool,
     pub old_rotation: Option<u16>,
     pub new_rotation: u16,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateArtifactDateRequest {
+    pub artifact_id: u32,
+    pub date: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UpdateArtifactDateResponse {
+    pub success: bool,
 }
 
 #[derive(Serialize, Deserialize)]

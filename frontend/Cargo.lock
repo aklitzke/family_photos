@@ -1367,6 +1367,7 @@ dependencies = [
  "ehttp",
  "gloo-timers",
  "image",
+ "js-sys",
  "poll-promise",
  "serde",
  "serde_json",

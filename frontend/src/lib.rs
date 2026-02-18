@@ -1,4 +1,4 @@
-use common::{Artifact, ArtifactListResponse, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse};
+use common::{Artifact, ArtifactListResponse, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactDateRequest, UpdateArtifactDateResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -17,6 +17,13 @@ const ZOOM_MIN: f32 = 0.1;
 const ZOOM_MAX: f32 = 50.0;
 const ZOOM_DEFAULT: f32 = 1.0;
 const THUMBNAIL_BATCH_SIZE: usize = 10;
+const MAX_TEXTURE_SIDE: u32 = 8192;
+
+#[derive(Clone)]
+struct FullImageLoaded {
+    color_image: ColorImage,
+    raw_bytes: Vec<u8>,
+}
 
 #[derive(Clone, PartialEq)]
 enum Page {
@@ -193,7 +200,7 @@ struct FamilyPhotosApp {
     thumbnail_failures: HashMap<String, String>,  // Track permanent failures
     full_images: HashMap<String, TextureHandle>,
     full_images_bytes: HashMap<String, Vec<u8>>,  // Cache raw bytes for rotation updates
-    full_images_loading: HashMap<String, Arc<Mutex<LoadState<Vec<u8>>>>>,
+    full_images_loading: HashMap<String, Arc<Mutex<LoadState<FullImageLoaded>>>>,
     full_image_failures: HashMap<String, String>,  // Track permanent failures
     zoom_controller: ZoomController,
     health: AsyncResource<HealthResponse>,
@@ -204,6 +211,10 @@ struct FamilyPhotosApp {
     search_query: String,
     images_visible_range: (usize, usize),      // (first, last) visible row indices
     artifacts_visible_range: (usize, usize),   // (first, last) visible row indices
+    date_edit_state: HashMap<u32, String>,      // In-progress date edits per artifact
+    date_updating: HashMap<u32, bool>,          // Track artifacts being date-updated
+    date_promises: HashMap<u32, Arc<Mutex<LoadState<UpdateArtifactDateResponse>>>>,
+    date_validation_error: HashMap<u32, String>, // Inline validation feedback
 }
 
 impl FamilyPhotosApp {
@@ -237,6 +248,10 @@ impl FamilyPhotosApp {
             search_query: String::new(),
             images_visible_range: (0, 0),
             artifacts_visible_range: (0, 0),
+            date_edit_state: HashMap::new(),
+            date_updating: HashMap::new(),
+            date_promises: HashMap::new(),
+            date_validation_error: HashMap::new(),
         }
     }
 
@@ -402,40 +417,58 @@ impl FamilyPhotosApp {
             return;
         }
 
-        // Check if we have cached bytes (from previous load) - if so, recreate texture from cache
-        // BUT only if images list is loaded - otherwise wait to ensure we have fresh metadata
-        if let Some(bytes) = self.full_images_bytes.get(key) {
-            if let LoadState::Loaded(images) = self.images.get() {
-                let rotation = images.iter()
-                    .find(|img| img.key == key)
-                    .and_then(|img| img.rotation);
-
-                if let Some(color_image) = load_image_from_bytes(bytes, rotation) {
-                    let texture = ctx.load_texture(
-                        format!("full_image_{}", key),
-                        color_image,
-                        Default::default(),
-                    );
-                    self.full_images.insert(key.to_string(), texture);
-                }
-                return;
-            }
-            // Images list not loaded yet - wait for it before recreating texture
-            // This ensures we use fresh rotation metadata after updates
-            return;
-        }
+        // Need rotation metadata from images list
+        let rotation = if let LoadState::Loaded(images) = self.images.get() {
+            images.iter()
+                .find(|img| img.key == key)
+                .and_then(|img| img.rotation)
+        } else {
+            return; // Wait for images list to load
+        };
 
         let loading_state = Arc::new(Mutex::new(LoadState::Loading));
         self.full_images_loading.insert(key.to_string(), loading_state.clone());
-
-        let key_encoded = urlencoding::encode(key).to_string();
         let ctx_clone = ctx.clone();
 
+        // Use cached raw bytes if available (for rotation re-renders)
+        if let Some(bytes) = self.full_images_bytes.get(key) {
+            let bytes = bytes.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                match decode_full_image(&bytes, rotation).await {
+                    Ok(color_image) => {
+                        *loading_state.lock().unwrap() = LoadState::Loaded(FullImageLoaded {
+                            color_image,
+                            raw_bytes: bytes,
+                        });
+                        ctx_clone.request_repaint();
+                    }
+                    Err(e) => {
+                        *loading_state.lock().unwrap() = LoadState::Failed(e);
+                        ctx_clone.request_repaint();
+                    }
+                }
+            });
+            return;
+        }
+
+        // Fetch from server, then decode using browser-native APIs
+        let key_encoded = urlencoding::encode(key).to_string();
         wasm_bindgen_futures::spawn_local(async move {
             match fetch_image_from_url(&format!("{}/api/images/full?key={}", API_BASE_URL, key_encoded)).await {
-                Ok(image_data) => {
-                    *loading_state.lock().unwrap() = LoadState::Loaded(image_data);
-                    ctx_clone.request_repaint();
+                Ok(bytes) => {
+                    match decode_full_image(&bytes, rotation).await {
+                        Ok(color_image) => {
+                            *loading_state.lock().unwrap() = LoadState::Loaded(FullImageLoaded {
+                                color_image,
+                                raw_bytes: bytes,
+                            });
+                            ctx_clone.request_repaint();
+                        }
+                        Err(e) => {
+                            *loading_state.lock().unwrap() = LoadState::Failed(e);
+                            ctx_clone.request_repaint();
+                        }
+                    }
                 }
                 Err(e) => {
                     *loading_state.lock().unwrap() = LoadState::Failed(format!("Failed to fetch image: {}", e));
@@ -489,33 +522,22 @@ impl FamilyPhotosApp {
     fn process_loaded_full_images(&mut self, ctx: &egui::Context) {
         let mut completed = Vec::new();
 
-        // Get rotation info from loaded images
-        let rotation_map: HashMap<String, Option<u16>> = if let LoadState::Loaded(images) = self.images.get() {
-            images.iter().map(|img| (img.key.clone(), img.rotation)).collect()
-        } else {
-            HashMap::new()
-        };
-
         for (id, loading_state) in &self.full_images_loading {
             let state = loading_state.lock().unwrap();
             match &*state {
                 LoadState::Loaded(data) => {
-                    // Cache raw bytes for rotation updates
-                    self.full_images_bytes.insert(id.clone(), data.clone());
+                    // Cache raw bytes for rotation re-renders
+                    self.full_images_bytes.insert(id.clone(), data.raw_bytes.clone());
 
-                    let rotation = rotation_map.get(id).and_then(|r| *r);
-                    if let Some(color_image) = load_image_from_bytes(data, rotation) {
-                        let texture = ctx.load_texture(
-                            format!("full_image_{}", id),
-                            color_image,
-                            Default::default(),
-                        );
-                        self.full_images.insert(id.clone(), texture);
-                    }
+                    let texture = ctx.load_texture(
+                        format!("full_image_{}", id),
+                        data.color_image.clone(),
+                        Default::default(),
+                    );
+                    self.full_images.insert(id.clone(), texture);
                     completed.push((id.clone(), None));
                 }
                 LoadState::Failed(err) => {
-                    // Store permanent failure
                     completed.push((id.clone(), Some(err.clone())));
                 }
                 _ => {}
@@ -699,6 +721,188 @@ impl FamilyPhotosApp {
             }
         }
     }
+
+    fn start_date_update(&mut self, artifact_id: u32, date: Option<String>) {
+        self.date_updating.insert(artifact_id, true);
+
+        // Update local artifact data immediately
+        if let LoadState::Loaded(artifacts) = &mut self.artifacts.state {
+            if let Some(a) = artifacts.iter_mut().find(|a| a.id == artifact_id) {
+                a.date = date.clone();
+            }
+        }
+
+        let loading_state = Arc::new(Mutex::new(LoadState::Loading));
+        self.date_promises.insert(artifact_id, loading_state.clone());
+
+        let request = UpdateArtifactDateRequest {
+            artifact_id,
+            date,
+        };
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = update_artifact_date(request).await;
+            let new_state = match result {
+                Ok(response) => LoadState::Loaded(response),
+                Err(error) => LoadState::Failed(error),
+            };
+            if let Ok(mut state) = loading_state.lock() {
+                *state = new_state;
+            }
+        });
+    }
+
+    fn process_date_updates(&mut self) {
+        let mut completed = Vec::new();
+
+        for (artifact_id, state_arc) in &self.date_promises {
+            if let Ok(state) = state_arc.lock() {
+                match &*state {
+                    LoadState::Loaded(response) => {
+                        completed.push((*artifact_id, Ok(response.clone())));
+                    }
+                    LoadState::Failed(error) => {
+                        completed.push((*artifact_id, Err(error.clone())));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for (artifact_id, result) in completed {
+            self.date_promises.remove(&artifact_id);
+            self.date_updating.remove(&artifact_id);
+
+            match result {
+                Ok(_) => {
+                    self.toast_message = Some(("Date updated".to_string(), false));
+                    self.toast_timer = 0.0;
+                }
+                Err(error) => {
+                    self.toast_message = Some((
+                        format!("Failed to update date: {}", error),
+                        true,
+                    ));
+                    self.toast_timer = 0.0;
+                }
+            }
+        }
+    }
+}
+
+/// Parse flexible date input into ISO 8601 partial date string.
+/// Returns None for empty/whitespace input (clears date), Some(iso) for valid input.
+/// Returns Err for unparseable input.
+fn parse_fuzzy_date(input: &str) -> Result<Option<String>, String> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Ok(None);
+    }
+
+    // Already ISO: "2020", "2020-12", "2020-12-05"
+    if let Some(_) = try_parse_iso(input) {
+        return Ok(Some(input.to_string()));
+    }
+
+    // MM/YYYY or MM-YYYY → YYYY-MM
+    if input.len() >= 6 && input.len() <= 7 {
+        if let Some(sep_pos) = input.find('/').or_else(|| input.find('-')) {
+            let (left, right) = (&input[..sep_pos], &input[sep_pos + 1..]);
+            if left.len() <= 2 && right.len() == 4 && right.chars().all(|c| c.is_ascii_digit()) {
+                if let Ok(month) = left.parse::<u8>() {
+                    if (1..=12).contains(&month) {
+                        return Ok(Some(format!("{}-{:02}", right, month)));
+                    }
+                }
+            }
+        }
+    }
+
+    // MM/DD/YYYY or MM-DD-YYYY → YYYY-MM-DD
+    if input.len() >= 8 && input.len() <= 10 {
+        let sep = if input.contains('/') { '/' } else { '-' };
+        let parts: Vec<&str> = input.split(sep).collect();
+        if parts.len() == 3 {
+            let (p0, p1, p2) = (parts[0], parts[1], parts[2]);
+            if p0.len() <= 2 && p1.len() <= 2 && p2.len() == 4 && p2.chars().all(|c| c.is_ascii_digit()) {
+                if let (Ok(month), Ok(day)) = (p0.parse::<u8>(), p1.parse::<u8>()) {
+                    if (1..=12).contains(&month) && (1..=31).contains(&day) {
+                        return Ok(Some(format!("{}-{:02}-{:02}", p2, month, day)));
+                    }
+                }
+            }
+        }
+    }
+
+    // Month name patterns: "December 2020", "Dec 2020"
+    let month_names = [
+        ("january", "jan", 1), ("february", "feb", 2), ("march", "mar", 3),
+        ("april", "apr", 4), ("may", "may", 5), ("june", "jun", 6),
+        ("july", "jul", 7), ("august", "aug", 8), ("september", "sep", 9),
+        ("october", "oct", 10), ("november", "nov", 11), ("december", "dec", 12),
+    ];
+
+    let lower = input.to_lowercase();
+    let words: Vec<&str> = lower.split_whitespace().collect();
+    if words.len() == 2 {
+        for &(full, abbr, num) in &month_names {
+            if words[0] == full || words[0] == abbr {
+                if let Ok(year) = words[1].parse::<u16>() {
+                    if year >= 1000 {
+                        return Ok(Some(format!("{}-{:02}", year, num)));
+                    }
+                }
+            }
+        }
+    }
+
+    Err(format!("Cannot parse date: '{}'", input))
+}
+
+fn try_parse_iso(s: &str) -> Option<()> {
+    let bytes = s.as_bytes();
+    if bytes.len() < 4 || !bytes[0..4].iter().all(|b| b.is_ascii_digit()) { return None; }
+    if bytes.len() == 4 { return Some(()); }
+    if bytes.len() < 7 || bytes[4] != b'-' { return None; }
+    if !bytes[5..7].iter().all(|b| b.is_ascii_digit()) { return None; }
+    let month: u8 = s[5..7].parse().ok()?;
+    if !(1..=12).contains(&month) { return None; }
+    if bytes.len() == 7 { return Some(()); }
+    if bytes.len() != 10 || bytes[7] != b'-' { return None; }
+    if !bytes[8..10].iter().all(|b| b.is_ascii_digit()) { return None; }
+    let day: u8 = s[8..10].parse().ok()?;
+    if !(1..=31).contains(&day) { return None; }
+    Some(())
+}
+
+/// Format an ISO date string for human-friendly display.
+fn format_date_for_display(iso: &str) -> String {
+    let month_names = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+
+    let parts: Vec<&str> = iso.split('-').collect();
+    match parts.len() {
+        1 => parts[0].to_string(), // "2020"
+        2 => {
+            if let Ok(m) = parts[1].parse::<usize>() {
+                if m >= 1 && m <= 12 {
+                    return format!("{} {}", month_names[m - 1], parts[0]);
+                }
+            }
+            iso.to_string()
+        }
+        3 => {
+            if let (Ok(m), Ok(d)) = (parts[1].parse::<usize>(), parts[2].parse::<u8>()) {
+                if m >= 1 && m <= 12 {
+                    return format!("{} {}, {}", month_names[m - 1], d, parts[0]);
+                }
+            }
+            iso.to_string()
+        }
+        _ => iso.to_string(),
+    }
 }
 
 impl eframe::App for FamilyPhotosApp {
@@ -709,6 +913,7 @@ impl eframe::App for FamilyPhotosApp {
         self.process_loaded_full_images(ctx);
         self.health.process();
         self.process_rotation_updates();
+        self.process_date_updates();
 
         // Auto-load data based on current page/view
         let current_page = self.get_current_page();
@@ -1273,10 +1478,59 @@ impl eframe::App for FamilyPhotosApp {
                                         ui.heading(egui::RichText::new("Attributes").size(24.0));
                                         ui.add_space(20.0);
 
+                                        // Date display and editing
                                         ui.horizontal(|ui| {
                                             ui.label(egui::RichText::new("Date:").strong());
-                                            ui.label("—");
+                                            if let Some(date) = &artifact.date {
+                                                ui.label(format_date_for_display(date));
+                                            } else {
+                                                ui.label("—");
+                                            }
                                         });
+
+                                        // Initialize edit state as empty (never pre-fill from saved date)
+                                        if !self.date_edit_state.contains_key(&artifact_id) {
+                                            self.date_edit_state.insert(artifact_id, String::new());
+                                        }
+
+                                        let is_updating = self.date_updating.get(&artifact_id).copied().unwrap_or(false);
+
+                                        let mut save_clicked = false;
+                                        let edit_text = self.date_edit_state.get_mut(&artifact_id).unwrap();
+                                        ui.add_enabled_ui(!is_updating, |ui| {
+                                            ui.add(
+                                                egui::TextEdit::singleline(edit_text)
+                                                    .hint_text("e.g. 2020, 12/2020, 02/05/2020")
+                                                    .desired_width(200.0)
+                                            );
+
+                                            if ui.button("Save").clicked() {
+                                                save_clicked = true;
+                                            }
+                                        });
+
+                                        if save_clicked {
+                                            let input = self.date_edit_state.get(&artifact_id)
+                                                .cloned().unwrap_or_default();
+                                            match parse_fuzzy_date(&input) {
+                                                Ok(parsed) => {
+                                                    self.date_validation_error.remove(&artifact_id);
+                                                    self.date_edit_state.remove(&artifact_id);
+                                                    self.start_date_update(artifact_id, parsed);
+                                                }
+                                                Err(msg) => {
+                                                    self.date_validation_error.insert(artifact_id, msg);
+                                                }
+                                            }
+                                        }
+
+                                        if is_updating {
+                                            ui.spinner();
+                                        }
+
+                                        if let Some(err) = self.date_validation_error.get(&artifact_id) {
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
 
                                         ui.add_space(10.0);
 
@@ -1420,7 +1674,10 @@ impl eframe::App for FamilyPhotosApp {
                                                     });
 
                                                     row.col(|ui| {
-                                                        if ui.selectable_label(false, "—").clicked() {
+                                                        let date_label = artifact.date.as_ref()
+                                                            .map(|d| format_date_for_display(d))
+                                                            .unwrap_or_else(|| "—".to_string());
+                                                        if ui.selectable_label(false, &date_label).clicked() {
                                                             clicked = true;
                                                         }
                                                     });
@@ -1580,17 +1837,56 @@ async fn update_image_rotation(request: RotateImageRequest) -> Result<RotateImag
     Ok(rotate_response)
 }
 
+async fn update_artifact_date(request: UpdateArtifactDateRequest) -> Result<UpdateArtifactDateResponse, String> {
+    let full_url = format!("{}/api/artifacts/update-date", API_BASE_URL);
+
+    let body_json = serde_json::to_string(&request)
+        .map_err(|e| format!("Failed to serialize request: {}", e))?;
+
+    let mut http_request = ehttp::Request::post(full_url, body_json.into_bytes());
+    http_request.headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+    let response = ehttp::fetch_async(http_request)
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.ok {
+        if let Ok(error_response) = serde_json::from_slice::<ErrorResponse>(&response.bytes) {
+            return Err(error_response.error);
+        }
+        return Err(format!(
+            "HTTP error: {} {}",
+            response.status, response.status_text
+        ));
+    }
+
+    serde_json::from_slice(&response.bytes)
+        .map_err(|e| format!("JSON parse error: {}", e))
+}
+
+/// Decode image using Rust image crate (used for thumbnails).
 fn load_image_from_bytes(bytes: &[u8], rotation: Option<u16>) -> Option<ColorImage> {
     match image::load_from_memory(bytes) {
         Ok(mut dynamic_image) => {
-            // Apply rotation if specified
             if let Some(degrees) = rotation {
                 dynamic_image = match degrees {
                     90 => dynamic_image.rotate90(),
                     180 => dynamic_image.rotate180(),
                     270 => dynamic_image.rotate270(),
-                    _ => dynamic_image, // 0 or invalid, no rotation
+                    _ => dynamic_image,
                 };
+            }
+
+            // Safety net: downscale if exceeding GPU max texture size
+            let (w, h) = (dynamic_image.width(), dynamic_image.height());
+            if w > MAX_TEXTURE_SIDE || h > MAX_TEXTURE_SIDE {
+                let scale = (MAX_TEXTURE_SIDE as f64 / w as f64)
+                    .min(MAX_TEXTURE_SIDE as f64 / h as f64);
+                let new_w = (w as f64 * scale) as u32;
+                let new_h = (h as f64 * scale) as u32;
+                dynamic_image = dynamic_image.resize_exact(
+                    new_w, new_h, image::imageops::FilterType::Triangle,
+                );
             }
 
             let rgba_image = dynamic_image.to_rgba8();
@@ -1603,4 +1899,106 @@ fn load_image_from_bytes(bytes: &[u8], rotation: Option<u16>) -> Option<ColorIma
             None
         }
     }
+}
+
+/// Decode a full image using the browser's native decoder (fast, non-blocking).
+/// Falls back to Rust image crate for formats the browser can't handle (e.g. TIFF).
+async fn decode_full_image(bytes: &[u8], rotation: Option<u16>) -> Result<ColorImage, String> {
+    match decode_image_native(bytes, rotation).await {
+        Ok(img) => Ok(img),
+        Err(_) => {
+            // Fallback to Rust image crate (slower but handles more formats)
+            load_image_from_bytes(bytes, rotation)
+                .ok_or_else(|| "Failed to decode image".to_string())
+        }
+    }
+}
+
+/// Browser-native image decode via createImageBitmap + canvas pixel extraction.
+/// The heavy decode work happens in browser internals (native code, off main thread).
+async fn decode_image_native(bytes: &[u8], rotation: Option<u16>) -> Result<ColorImage, String> {
+    use wasm_bindgen::JsCast;
+
+    // Create Blob from raw bytes
+    let uint8_array = js_sys::Uint8Array::from(bytes);
+    let parts = js_sys::Array::new();
+    parts.push(&uint8_array);
+    let blob = web_sys::Blob::new_with_u8_array_sequence(&parts)
+        .map_err(|e| format!("Blob creation failed: {:?}", e))?;
+
+    // Browser-native async image decode
+    let window = web_sys::window().ok_or("No window")?;
+    let promise = window.create_image_bitmap_with_blob(&blob)
+        .map_err(|e| format!("createImageBitmap failed: {:?}", e))?;
+    let bitmap_js = wasm_bindgen_futures::JsFuture::from(promise).await
+        .map_err(|e| format!("Image decode failed: {:?}", e))?;
+    let bitmap: web_sys::ImageBitmap = bitmap_js.dyn_into()
+        .map_err(|_| "Not an ImageBitmap".to_string())?;
+
+    let bw = bitmap.width();
+    let bh = bitmap.height();
+    let degrees = rotation.unwrap_or(0);
+
+    // Output dimensions after rotation
+    let (out_w, out_h) = match degrees {
+        90 | 270 => (bh, bw),
+        _ => (bw, bh),
+    };
+
+    // Scale down if exceeding GPU max texture size
+    let scale = if out_w > MAX_TEXTURE_SIDE || out_h > MAX_TEXTURE_SIDE {
+        (MAX_TEXTURE_SIDE as f64 / out_w as f64).min(MAX_TEXTURE_SIDE as f64 / out_h as f64)
+    } else {
+        1.0
+    };
+    let canvas_w = ((out_w as f64) * scale) as u32;
+    let canvas_h = ((out_h as f64) * scale) as u32;
+
+    // Create temporary canvas for pixel extraction
+    let document = window.document().ok_or("No document")?;
+    let canvas = document.create_element("canvas")
+        .map_err(|e| format!("createElement failed: {:?}", e))?
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .map_err(|_| "Not a canvas element".to_string())?;
+    canvas.set_width(canvas_w);
+    canvas.set_height(canvas_h);
+
+    let ctx = canvas.get_context("2d")
+        .map_err(|e| format!("getContext failed: {:?}", e))?
+        .ok_or("No 2d context")?
+        .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        .map_err(|_| "Not a 2d context".to_string())?;
+
+    // Apply rotation transform, then draw scaled bitmap
+    let draw_w = bw as f64 * scale;
+    let draw_h = bh as f64 * scale;
+
+    match degrees {
+        90 => {
+            let _ = ctx.translate(canvas_w as f64, 0.0);
+            let _ = ctx.rotate(std::f64::consts::FRAC_PI_2);
+        }
+        180 => {
+            let _ = ctx.translate(canvas_w as f64, canvas_h as f64);
+            let _ = ctx.rotate(std::f64::consts::PI);
+        }
+        270 => {
+            let _ = ctx.translate(0.0, canvas_h as f64);
+            let _ = ctx.rotate(-std::f64::consts::FRAC_PI_2);
+        }
+        _ => {}
+    }
+
+    ctx.draw_image_with_image_bitmap_and_dw_and_dh(&bitmap, 0.0, 0.0, draw_w, draw_h)
+        .map_err(|e| format!("drawImage failed: {:?}", e))?;
+
+    // Extract RGBA pixels
+    let image_data = ctx.get_image_data(0.0, 0.0, canvas_w as f64, canvas_h as f64)
+        .map_err(|e| format!("getImageData failed: {:?}", e))?;
+    let pixels = image_data.data().to_vec();
+
+    Ok(ColorImage::from_rgba_unmultiplied(
+        [canvas_w as usize, canvas_h as usize],
+        &pixels,
+    ))
 }

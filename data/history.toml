@@ -1,5 +1,6 @@
 [[artifacts]]
 id = 1
+date = "1988"
 images.front1 = "Family History/Pile 1/2025-12-23-21-51-0001"
 
 [[artifacts]]
@@ -13127,6 +13128,7 @@ key = "Family History/Pile 12/FastFoto_0363_b"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0364"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0364_b"
@@ -13327,6 +13329,7 @@ key = "Family History/Pile 12/FastFoto_0396_b"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0397"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0397_b"
@@ -13604,6 +13607,7 @@ key = "Family History/Pile 12/FastFoto_0442_b"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0443"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0443_b"
@@ -14275,6 +14279,7 @@ key = "Family History/Pile 13/FastFoto_0552_b"
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0553"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0553_b"
@@ -15404,6 +15409,7 @@ key = "Family History/Pile 18 Florida Box/FastFoto_0740_b"
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0741"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0741_b"
@@ -15466,6 +15472,7 @@ key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0750_b"
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0751"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0751_b"
@@ -17247,9 +17254,11 @@ key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0906_b"
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0907"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0907_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0908"
@@ -17259,6 +17268,7 @@ key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0908_b"
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0909"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0909_b"
@@ -17709,6 +17719,7 @@ key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0982_b"
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0983"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0983_b"
@@ -18421,6 +18432,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1094"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1094_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1095"
@@ -18616,12 +18628,14 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1126_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1127"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1127_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1128"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1128_b"
@@ -18634,18 +18648,21 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1129_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1130"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1130_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1131"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1131_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1132"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1132_b"
@@ -18664,6 +18681,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1134_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1135"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1135_b"
@@ -18700,6 +18718,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1140_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1141"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1141_b"
@@ -18712,6 +18731,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1142_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1143"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1143_b"
@@ -19117,9 +19137,11 @@ key = "Family History/Pile 27 Picture Book/FastFoto_1202_b"
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1203"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1203_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1204"
@@ -19183,9 +19205,11 @@ key = "Family History/Pile 27 Picture Book/FastFoto_1213_b"
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1214"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1214_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1215"
@@ -20346,6 +20370,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1409_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1410"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1410_b"
@@ -20412,6 +20437,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1420_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1421"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1421_b"
@@ -20544,6 +20570,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1443_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1444"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1444_b"
@@ -21006,6 +21033,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1561_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1562"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1562_b"
@@ -21561,12 +21589,15 @@ key = "Family History/Pile 3 Again/FastFoto_0048_b"
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0049"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0049_a"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0049_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0050"
@@ -24350,6 +24381,7 @@ key = "Family History/Pile 7 Again/FastFoto_1768_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1769"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1769_b"
@@ -24464,6 +24496,7 @@ key = "Family History/Pile 7 Again/FastFoto_1787_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1788"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1788_b"
@@ -24536,9 +24569,11 @@ key = "Family History/Pile 7 Again/FastFoto_1799_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1800"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1800_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1801"
@@ -24914,6 +24949,7 @@ key = "Family History/Pile 7 Again/FastFoto_1862_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1863"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1863_b"
@@ -25028,9 +25064,11 @@ key = "Family History/Pile 7 Again/FastFoto_1882_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1883"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1883_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1884"
