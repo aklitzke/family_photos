@@ -14225,6 +14225,7 @@ key = "Family History/Pile 13/FastFoto_0543_b"
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0544"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0544_b"
@@ -16701,6 +16702,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0817_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0818"
