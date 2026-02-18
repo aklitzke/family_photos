@@ -1,4 +1,4 @@
-use common::{artifact_date, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
+use common::{artifact_date, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -212,7 +212,9 @@ struct FamilyPhotosApp {
     images_visible_range: (usize, usize),      // (first, last) visible row indices
     artifacts_visible_range: (usize, usize),   // (first, last) visible row indices
     update_date_state: HashMap<u32, String>,      // In-progress date edits per artifact
-    update_reason_state: HashMap<u32, String>,   // In-progress reason edits per artifact
+    update_comment_state: HashMap<u32, String>,  // In-progress comment edits per artifact
+    update_tag_input: HashMap<u32, String>,      // Tag input text per artifact
+    update_tags_pending: HashMap<u32, Vec<String>>, // Tags staged for this update
     update_in_progress: HashMap<u32, bool>,      // Track artifacts being updated
     update_promises: HashMap<u32, Arc<Mutex<LoadState<UpdateArtifactResponse>>>>,
     update_validation_error: HashMap<u32, String>, // Inline validation feedback
@@ -250,7 +252,9 @@ impl FamilyPhotosApp {
             images_visible_range: (0, 0),
             artifacts_visible_range: (0, 0),
             update_date_state: HashMap::new(),
-            update_reason_state: HashMap::new(),
+            update_comment_state: HashMap::new(),
+            update_tag_input: HashMap::new(),
+            update_tags_pending: HashMap::new(),
             update_in_progress: HashMap::new(),
             update_promises: HashMap::new(),
             update_validation_error: HashMap::new(),
@@ -724,7 +728,7 @@ impl FamilyPhotosApp {
         }
     }
 
-    fn start_artifact_update(&mut self, artifact_id: u32, reason: String, date: Option<String>) {
+    fn start_artifact_update(&mut self, artifact_id: u32, reason: String, date: Option<String>, tags: Option<Vec<String>>) {
         self.update_in_progress.insert(artifact_id, true);
 
         // Optimistically update local artifact data
@@ -735,6 +739,7 @@ impl FamilyPhotosApp {
                     updated: String::new(),
                     reason: reason.clone(),
                     date: date.clone(),
+                    tags: tags.clone(),
                 });
             }
         }
@@ -746,6 +751,7 @@ impl FamilyPhotosApp {
             artifact_id,
             reason,
             date,
+            tags,
         };
 
         wasm_bindgen_futures::spawn_local(async move {
@@ -1511,6 +1517,21 @@ impl eframe::App for FamilyPhotosApp {
                                         });
 
                                         ui.add_space(10.0);
+
+                                        // Tags display
+                                        let current_tags = artifact_tags(&artifact);
+                                        ui.horizontal_wrapped(|ui| {
+                                            ui.label(egui::RichText::new("Tags:").strong());
+                                            if current_tags.is_empty() {
+                                                ui.label("—");
+                                            } else {
+                                                for tag in current_tags {
+                                                    ui.label(tag);
+                                                }
+                                            }
+                                        });
+
+                                        ui.add_space(10.0);
                                         ui.separator();
                                         ui.add_space(10.0);
 
@@ -1522,15 +1543,39 @@ impl eframe::App for FamilyPhotosApp {
                                         if !self.update_date_state.contains_key(&artifact_id) {
                                             self.update_date_state.insert(artifact_id, String::new());
                                         }
-                                        if !self.update_reason_state.contains_key(&artifact_id) {
-                                            self.update_reason_state.insert(artifact_id, String::new());
+                                        if !self.update_comment_state.contains_key(&artifact_id) {
+                                            self.update_comment_state.insert(artifact_id, String::new());
+                                        }
+                                        if !self.update_tag_input.contains_key(&artifact_id) {
+                                            self.update_tag_input.insert(artifact_id, String::new());
+                                        }
+                                        if !self.update_tags_pending.contains_key(&artifact_id) {
+                                            self.update_tags_pending.insert(artifact_id, current_tags.to_vec());
                                         }
 
                                         let is_updating = self.update_in_progress.get(&artifact_id).copied().unwrap_or(false);
 
+                                        // Collect all known tags for autocomplete
+                                        let all_tags: Vec<String> = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
+                                            let mut tags: Vec<String> = artifacts.iter()
+                                                .flat_map(|a| artifact_tags(a).iter().cloned())
+                                                .collect();
+                                            tags.sort();
+                                            tags.dedup();
+                                            tags
+                                        } else {
+                                            Vec::new()
+                                        };
+
                                         let mut save_clicked = false;
+                                        let mut tag_to_add: Option<String> = None;
+                                        let mut tag_to_remove: Option<String> = None;
+
                                         let date_text = self.update_date_state.get_mut(&artifact_id).unwrap();
-                                        let reason_text = self.update_reason_state.get_mut(&artifact_id).unwrap();
+                                        let comment_text = self.update_comment_state.get_mut(&artifact_id).unwrap();
+                                        let tag_input = self.update_tag_input.get_mut(&artifact_id).unwrap();
+                                        let pending_tags = self.update_tags_pending.get_mut(&artifact_id).unwrap();
+
                                         ui.add_enabled_ui(!is_updating, |ui| {
                                             ui.horizontal(|ui| {
                                                 ui.label("Date:");
@@ -1541,41 +1586,129 @@ impl eframe::App for FamilyPhotosApp {
                                                 );
                                             });
 
-                                            ui.horizontal(|ui| {
-                                                ui.label("Reason:");
-                                                ui.add(
-                                                    egui::TextEdit::singleline(reason_text)
-                                                        .hint_text("Why are you making this change?")
-                                                        .desired_width(200.0)
-                                                );
+                                            ui.add_space(5.0);
+
+                                            // Tags editing
+                                            ui.label("Tags:");
+
+                                            // Show pending tags as removable chips
+                                            ui.horizontal_wrapped(|ui| {
+                                                for tag in pending_tags.iter() {
+                                                    let btn = ui.button(format!("{} ✕", tag));
+                                                    if btn.clicked() {
+                                                        tag_to_remove = Some(tag.clone());
+                                                    }
+                                                }
                                             });
+
+                                            // Tag input with autocomplete
+                                            let tag_response = ui.add(
+                                                egui::TextEdit::singleline(tag_input)
+                                                    .hint_text("Add a tag...")
+                                                    .desired_width(200.0)
+                                            );
+
+                                            // Show autocomplete suggestions
+                                            if !tag_input.trim().is_empty() {
+                                                let query = tag_input.trim().to_lowercase();
+                                                let suggestions: Vec<&String> = all_tags.iter()
+                                                    .filter(|t| t.to_lowercase().contains(&query) && !pending_tags.contains(t))
+                                                    .take(5)
+                                                    .collect();
+
+                                                if !suggestions.is_empty() {
+                                                    egui::Frame::popup(ui.style())
+                                                        .show(ui, |ui| {
+                                                            for suggestion in &suggestions {
+                                                                if ui.selectable_label(false, suggestion.as_str()).clicked() {
+                                                                    tag_to_add = Some((*suggestion).clone());
+                                                                }
+                                                            }
+                                                        });
+                                                }
+                                            }
+
+                                            // Enter key adds the tag
+                                            if tag_response.lost_focus()
+                                                && ui.input(|i| i.key_pressed(egui::Key::Enter))
+                                                && !tag_input.trim().is_empty()
+                                            {
+                                                tag_to_add = Some(tag_input.trim().to_lowercase().to_string());
+                                            }
+
+                                            ui.add_space(5.0);
+
+                                            ui.label("Comment:");
+                                            ui.add(
+                                                egui::TextEdit::multiline(comment_text)
+                                                    .hint_text("Why are you making this change?")
+                                                    .desired_width(250.0)
+                                                    .desired_rows(3)
+                                            );
 
                                             if ui.button("Save").clicked() {
                                                 save_clicked = true;
                                             }
                                         });
 
+                                        // Process tag add/remove outside the closure
+                                        if let Some(tag) = tag_to_add {
+                                            let pending = self.update_tags_pending.get_mut(&artifact_id).unwrap();
+                                            if !pending.contains(&tag) {
+                                                pending.push(tag);
+                                                pending.sort();
+                                            }
+                                            self.update_tag_input.insert(artifact_id, String::new());
+                                        }
+                                        if let Some(tag) = tag_to_remove {
+                                            let pending = self.update_tags_pending.get_mut(&artifact_id).unwrap();
+                                            pending.retain(|t| t != &tag);
+                                        }
+
                                         if save_clicked {
                                             let date_input = self.update_date_state.get(&artifact_id)
                                                 .cloned().unwrap_or_default();
-                                            let reason_input = self.update_reason_state.get(&artifact_id)
+                                            let comment_input = self.update_comment_state.get(&artifact_id)
+                                                .cloned().unwrap_or_default();
+                                            let pending = self.update_tags_pending.get(&artifact_id)
                                                 .cloned().unwrap_or_default();
 
-                                            if date_input.trim().is_empty() {
-                                                self.update_validation_error.insert(artifact_id, "Date is required".to_string());
-                                            } else if reason_input.trim().is_empty() {
-                                                self.update_validation_error.insert(artifact_id, "Reason is required".to_string());
+                                            let tags_changed = pending != current_tags;
+                                            let has_date = !date_input.trim().is_empty();
+
+                                            if !has_date && !tags_changed {
+                                                self.update_validation_error.insert(artifact_id, "Date or tag change is required".to_string());
+                                            } else if comment_input.trim().is_empty() {
+                                                self.update_validation_error.insert(artifact_id, "Comment is required".to_string());
                                             } else {
-                                                match parse_fuzzy_date(&date_input) {
-                                                    Ok(parsed_date) => {
-                                                        self.update_validation_error.remove(&artifact_id);
-                                                        self.update_date_state.remove(&artifact_id);
-                                                        self.update_reason_state.remove(&artifact_id);
-                                                        self.start_artifact_update(artifact_id, reason_input.trim().to_string(), parsed_date);
+                                                let parsed_date = if has_date {
+                                                    match parse_fuzzy_date(&date_input) {
+                                                        Ok(d) => d,
+                                                        Err(msg) => {
+                                                            self.update_validation_error.insert(artifact_id, msg);
+                                                            None // won't be used, early return below
+                                                        }
                                                     }
-                                                    Err(msg) => {
-                                                        self.update_validation_error.insert(artifact_id, msg);
-                                                    }
+                                                } else {
+                                                    None
+                                                };
+
+                                                // Check if date parsing failed
+                                                if has_date && self.update_validation_error.contains_key(&artifact_id) {
+                                                    // parse error was set above, skip
+                                                } else {
+                                                    let tags_to_send = if tags_changed { Some(pending) } else { None };
+                                                    self.update_validation_error.remove(&artifact_id);
+                                                    self.update_date_state.remove(&artifact_id);
+                                                    self.update_comment_state.remove(&artifact_id);
+                                                    self.update_tag_input.remove(&artifact_id);
+                                                    self.update_tags_pending.remove(&artifact_id);
+                                                    self.start_artifact_update(
+                                                        artifact_id,
+                                                        comment_input.trim().to_string(),
+                                                        parsed_date,
+                                                        tags_to_send,
+                                                    );
                                                 }
                                             }
                                         }
@@ -1587,20 +1720,6 @@ impl eframe::App for FamilyPhotosApp {
                                         if let Some(err) = self.update_validation_error.get(&artifact_id) {
                                             ui.colored_label(egui::Color32::RED, err);
                                         }
-
-                                        ui.add_space(10.0);
-
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new("Size:").strong());
-                                            ui.label("—");
-                                        });
-
-                                        ui.add_space(10.0);
-
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new("Tags:").strong());
-                                            ui.label("—");
-                                        });
                                     });
                                 });
                             } else {
@@ -1661,12 +1780,10 @@ impl eframe::App for FamilyPhotosApp {
                                             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                                             .column(Column::exact(100.0))
                                             .column(Column::exact(120.0))
-                                            .column(Column::exact(100.0))
                                             .column(Column::remainder().at_least(150.0))
                                             .header(30.0, |mut header| {
                                                 header.col(|ui| { ui.strong("Thumbnail"); });
                                                 header.col(|ui| { ui.strong("Date"); });
-                                                header.col(|ui| { ui.strong("Size"); });
                                                 header.col(|ui| { ui.strong("Tags"); });
                                             })
                                             .body(|body| {
@@ -1739,13 +1856,13 @@ impl eframe::App for FamilyPhotosApp {
                                                     });
 
                                                     row.col(|ui| {
-                                                        if ui.selectable_label(false, "—").clicked() {
-                                                            clicked = true;
-                                                        }
-                                                    });
-
-                                                    row.col(|ui| {
-                                                        if ui.selectable_label(false, "—").clicked() {
+                                                        let tags = artifact_tags(artifact);
+                                                        let tags_label = if tags.is_empty() {
+                                                            "—".to_string()
+                                                        } else {
+                                                            tags.join(", ")
+                                                        };
+                                                        if ui.selectable_label(false, &tags_label).clicked() {
                                                             clicked = true;
                                                         }
                                                     });

@@ -336,6 +336,7 @@ async fn update_artifact(
         updated: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         reason: request.reason,
         date: request.date,
+        tags: request.tags,
     };
 
     history.artifacts[idx].updates.push(update.clone());

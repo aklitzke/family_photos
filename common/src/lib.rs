@@ -35,6 +35,8 @@ pub struct ArtifactUpdate {
     pub reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -49,6 +51,13 @@ pub struct Artifact {
 pub fn artifact_date(artifact: &Artifact) -> Option<&str> {
     artifact.updates.iter().rev()
         .find_map(|u| u.date.as_deref())
+}
+
+/// Returns the most recent tags from an artifact's update history.
+pub fn artifact_tags(artifact: &Artifact) -> &[String] {
+    artifact.updates.iter().rev()
+        .find_map(|u| u.tags.as_deref())
+        .unwrap_or(&[])
 }
 
 #[derive(Serialize, Deserialize)]
@@ -96,6 +105,7 @@ pub struct UpdateArtifactRequest {
     pub artifact_id: u32,
     pub reason: String,
     pub date: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

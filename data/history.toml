@@ -28,6 +28,12 @@ id = 5
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0830"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0830_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-18T03:07:30Z"
+reason = "that's the lakewood raft"
+tags = ["lakewood"]
+
 [[artifacts]]
 id = 6
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0812"
@@ -43,6 +49,12 @@ author = "andrew"
 updated = "2026-02-18T02:45:30Z"
 reason = "Estimate based on Andrew's Age"
 date = "2002"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-18T03:20:26Z"
+reason = "that's the lakewood grass and wood / fish hut"
+tags = ["lakewood"]
 
 [[artifacts]]
 id = 8
@@ -72,6 +84,12 @@ images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0807_b"
 id = 13
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0821"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0821_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-18T03:05:22Z"
+reason = "Written on back of image"
+date = "1992"
 
 [[artifacts]]
 id = 14
@@ -16741,6 +16759,7 @@ key = "Family History/Pile 21 Lakewood Box/FastFoto_0821"
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0821_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0822"
