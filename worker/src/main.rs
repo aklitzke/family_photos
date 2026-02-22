@@ -337,6 +337,8 @@ async fn update_artifact(
         reason: request.reason,
         date: request.date,
         tags: request.tags,
+        people: request.people,
+        location: request.location,
     };
 
     history.artifacts[idx].updates.push(update.clone());

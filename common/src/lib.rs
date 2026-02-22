@@ -37,6 +37,10 @@ pub struct ArtifactUpdate {
     pub date: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub people: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -58,6 +62,19 @@ pub fn artifact_tags(artifact: &Artifact) -> &[String] {
     artifact.updates.iter().rev()
         .find_map(|u| u.tags.as_deref())
         .unwrap_or(&[])
+}
+
+/// Returns the most recent people from an artifact's update history.
+pub fn artifact_people(artifact: &Artifact) -> &[String] {
+    artifact.updates.iter().rev()
+        .find_map(|u| u.people.as_deref())
+        .unwrap_or(&[])
+}
+
+/// Returns the most recent location from an artifact's update history.
+pub fn artifact_location(artifact: &Artifact) -> Option<&str> {
+    artifact.updates.iter().rev()
+        .find_map(|u| u.location.as_deref())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -106,6 +123,8 @@ pub struct UpdateArtifactRequest {
     pub reason: String,
     pub date: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub people: Option<Vec<String>>,
+    pub location: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

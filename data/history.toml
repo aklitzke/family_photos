@@ -427,6 +427,14 @@ images.front1 = "Family History/Pile 3 Again/FastFoto_0085_a"
 images.front2 = "Family History/Pile 3 Again/FastFoto_0085"
 images.back1 = "Family History/Pile 3 Again/FastFoto_0085_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T23:15:19Z"
+reason = "that's our old house"
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 82
 images.front1 = "Family History/Pile 28 Chocolate Box/FastFoto_1607"
@@ -6914,6 +6922,13 @@ images.back1 = "Family History/Pile 3 Again/FastFoto_0104_b"
 id = 1377
 images.front1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1112"
 images.back1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1112_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T23:13:04Z"
+reason = "Date written on back"
+date = "1956"
+people = ["Robert Klitzke"]
 
 [[artifacts]]
 id = 1378
@@ -14022,6 +14037,7 @@ key = "Family History/Pile 13/FastFoto_0501_b"
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0502"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 13/FastFoto_0502_b"
@@ -16612,9 +16628,11 @@ key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0796_b"
 
 [[images]]
 key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0797"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0797_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0798"
@@ -18591,9 +18609,11 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1111_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1112"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1112_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1113"
@@ -21815,12 +21835,15 @@ key = "Family History/Pile 3 Again/FastFoto_0084_a"
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0085"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0085_a"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0085_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0086"
@@ -21980,12 +22003,15 @@ key = "Family History/Pile 3 Again/FastFoto_0103_b"
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0104"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0104_a"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0104_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0105"
