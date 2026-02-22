@@ -1831,11 +1831,13 @@ impl eframe::App for FamilyPhotosApp {
                                             } else if comment_input.trim().is_empty() {
                                                 self.update_validation_error.insert(artifact_id, "Comment is required".to_string());
                                             } else {
+                                                let mut date_parse_error = false;
                                                 let parsed_date = if has_date {
                                                     match parse_fuzzy_date(&date_input) {
                                                         Ok(d) => d,
                                                         Err(msg) => {
                                                             self.update_validation_error.insert(artifact_id, msg);
+                                                            date_parse_error = true;
                                                             None
                                                         }
                                                     }
@@ -1843,8 +1845,8 @@ impl eframe::App for FamilyPhotosApp {
                                                     None
                                                 };
 
-                                                if has_date && self.update_validation_error.contains_key(&artifact_id) {
-                                                    // parse error was set above, skip
+                                                if date_parse_error {
+                                                    // skip submission
                                                 } else {
                                                     let tags_to_send = if tags_changed { Some(pending_t) } else { None };
                                                     let people_to_send = if people_changed { Some(pending_p) } else { None };
@@ -2006,11 +2008,15 @@ impl eframe::App for FamilyPhotosApp {
                                             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                                             .column(Column::exact(100.0))
                                             .column(Column::exact(120.0))
+                                            .column(Column::exact(150.0))
+                                            .column(Column::exact(150.0))
                                             .column(Column::remainder().at_least(150.0))
                                             .header(30.0, |mut header| {
                                                 header.col(|ui| { ui.strong("Thumbnail"); });
                                                 header.col(|ui| { ui.strong("Date"); });
                                                 header.col(|ui| { ui.strong("Tags"); });
+                                                header.col(|ui| { ui.strong("People"); });
+                                                header.col(|ui| { ui.strong("Location"); });
                                             })
                                             .body(|body| {
                                                 body.rows(thumbnail_height, artifacts.len(), |mut row| {
@@ -2089,6 +2095,26 @@ impl eframe::App for FamilyPhotosApp {
                                                             tags.join(", ")
                                                         };
                                                         if ui.selectable_label(false, &tags_label).clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        let people = artifact_people(artifact);
+                                                        let people_label = if people.is_empty() {
+                                                            "—".to_string()
+                                                        } else {
+                                                            people.join(", ")
+                                                        };
+                                                        if ui.selectable_label(false, &people_label).clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        let location_label = artifact_location(artifact)
+                                                            .unwrap_or("—");
+                                                        if ui.selectable_label(false, location_label).clicked() {
                                                             clicked = true;
                                                         }
                                                     });

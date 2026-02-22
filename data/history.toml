@@ -62,6 +62,12 @@ updated = "2026-02-18T03:20:26Z"
 reason = "that's the lakewood grass and wood / fish hut"
 tags = ["lakewood"]
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T23:24:54Z"
+reason = "that's me!"
+people = ["Andrew Klitzke"]
+
 [[artifacts]]
 id = 8
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0801"
@@ -185,6 +191,18 @@ id = 28
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0827"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0827_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T23:24:25Z"
+reason = "looks like lakewood, says lakewood on back, found in pile of lakewood photos"
+date = "1998"
+tags = ["lakewood"]
+people = [
+    "Andrew Klitzke",
+    "Laura Klitzke",
+    "Robert Klitzke",
+]
+
 [[artifacts]]
 id = 29
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0816"
@@ -290,6 +308,16 @@ images.front1 = "Family History/Pile 1/2025-12-23-21-54-0002"
 [[artifacts]]
 id = 51
 images.front1 = "Family History/Pile 1/2025-12-23-21-54-0003"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T23:17:44Z"
+reason = "looks like fl"
+tags = ["florida"]
+people = [
+    "Frank Jossi",
+    "Robert Klitzke",
+]
 
 [[artifacts]]
 id = 52
@@ -16839,6 +16867,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0827_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0828"
