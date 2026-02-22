@@ -1722,6 +1722,51 @@ impl eframe::App for FamilyPhotosApp {
                                         }
                                     });
                                 });
+
+                                // Update history
+                                if !artifact.updates.is_empty() {
+                                    ui.add_space(20.0);
+                                    ui.separator();
+                                    ui.add_space(10.0);
+
+                                    ui.heading(egui::RichText::new("History").size(20.0));
+                                    ui.add_space(10.0);
+
+                                    // Show updates in reverse chronological order
+                                    for update in artifact.updates.iter().rev() {
+                                        egui::Frame::group(ui.style())
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new(&update.author).strong());
+                                                    if !update.updated.is_empty() {
+                                                        ui.label(egui::RichText::new(&update.updated).weak());
+                                                    }
+                                                });
+
+                                                // Show what changed
+                                                if let Some(date) = &update.date {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(egui::RichText::new("Date:").italics());
+                                                        ui.label(format_date_for_display(date));
+                                                    });
+                                                }
+                                                if let Some(tags) = &update.tags {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(egui::RichText::new("Tags:").italics());
+                                                        if tags.is_empty() {
+                                                            ui.label("(cleared)");
+                                                        } else {
+                                                            ui.label(tags.join(", "));
+                                                        }
+                                                    });
+                                                }
+
+                                                ui.label(&update.reason);
+                                            });
+
+                                        ui.add_space(5.0);
+                                    }
+                                }
                             } else {
                                 ui.vertical_centered(|ui| {
                                     ui.add_space(40.0);

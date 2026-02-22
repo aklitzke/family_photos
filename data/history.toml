@@ -38,9 +38,7 @@ tags = ["lakewood"]
 author = "andrew"
 updated = "2026-02-18T03:21:35Z"
 reason = "water"
-tags = [
-    "lakewood",
-]
+tags = ["lakewood"]
 
 [[artifacts]]
 id = 6
@@ -98,6 +96,13 @@ author = "andrew"
 updated = "2026-02-18T03:05:22Z"
 reason = "Written on back of image"
 date = "1992"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T22:23:20Z"
+reason = "Written on back, that's lakewood's lawn and buildings"
+date = "1992"
+tags = ["lakewood"]
 
 [[artifacts]]
 id = 14
@@ -22608,9 +22613,11 @@ key = "Family History/Pile 4 Again/FastFoto_0138_a"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0139"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0139_a"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0140"
