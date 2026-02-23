@@ -30,3 +30,11 @@ node_modules
 
 # Hosted image files which are not to contain originals, but derived photos
 images
+
+# Python virtualenv (dependencies tracked via uv.lock instead)
+ml/.venv/
+# Downloaded ML model weights
+ml/models/
+# Output files from ML scripts
+ml/*.csv
+ml/*.json

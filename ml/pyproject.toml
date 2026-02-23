@@ -1,0 +1,25 @@
+[project]
+name = "ml"
+version = "0.1.0"
+description = "ML tools for family photos: rotation detection, face recognition, captioning"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "torchvision",
+    "huggingface_hub",
+    "insightface",
+    "onnxruntime-gpu>=1.16,<1.20",
+    "opencv-python-headless",
+    "pillow",
+    "tqdm",
+    "numpy",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
