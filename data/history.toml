@@ -23,6 +23,17 @@ id = 4
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0824"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0824_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-22T23:50:05Z"
+reason = "found in a pile of lakewood photos"
+tags = ["lakewood"]
+people = [
+    "Laura Klitzke",
+    "Robert Klitzke",
+]
+location = "lakewood"
+
 [[artifacts]]
 id = 5
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0830"
@@ -586,6 +597,17 @@ id = 106
 images.front1 = "Family History/Pile 7 Again/FastFoto_1725"
 images.back1 = "Family History/Pile 7 Again/FastFoto_1725_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:02:17Z"
+reason = "Printed on sign. Can't recall year"
+tags = ["st louis road trip"]
+people = [
+    "Andrew Klitzke",
+    "Laura Klitzke",
+]
+location = "Hannibal, MO"
+
 [[artifacts]]
 id = 107
 images.front1 = "Family History/Pile 5 Again/FastFoto_0298"
@@ -609,6 +631,15 @@ id = 111
 images.front1 = "Family History/Pile 28 Chocolate Box/FastFoto_1446"
 images.back1 = "Family History/Pile 28 Chocolate Box/FastFoto_1446_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:04:21Z"
+reason = "thats them"
+people = [
+    "Katherine Jossi",
+    "Laura Klitzke",
+]
+
 [[artifacts]]
 id = 112
 images.front1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1153"
@@ -618,6 +649,12 @@ images.back1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_11
 id = 113
 images.front1 = "Family History/Pile 17/FastFoto_0679"
 images.back1 = "Family History/Pile 17/FastFoto_0679_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:05:47Z"
+reason = "looks like it and that's where they parked their boats"
+location = "South Shore Yacht Club"
 
 [[artifacts]]
 id = 114
@@ -15131,6 +15168,7 @@ key = "Family History/Pile 17/FastFoto_0678_b"
 
 [[images]]
 key = "Family History/Pile 17/FastFoto_0679"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 17/FastFoto_0679_b"
@@ -16620,9 +16658,11 @@ key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0790_b"
 
 [[images]]
 key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0791"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0791_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 20 Vacations With Others Box/FastFoto_0792"
@@ -18870,9 +18910,11 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1148_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1149"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1149_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1150"
@@ -20685,6 +20727,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1445_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1446"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1446_b"
@@ -23120,6 +23163,7 @@ key = "Family History/Pile 4 Again/FastFoto_0215_b"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0216"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0217"
@@ -23915,6 +23959,7 @@ key = "Family History/Pile 5 Again/FastFoto_0297_b"
 
 [[images]]
 key = "Family History/Pile 5 Again/FastFoto_0298"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 5 Again/FastFoto_0299"
@@ -24227,6 +24272,7 @@ key = "Family History/Pile 7 Again/FastFoto_1724_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1725"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1725_b"

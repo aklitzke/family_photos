@@ -971,6 +971,10 @@ impl eframe::App for FamilyPhotosApp {
                 if matches!(self.images.get(), LoadState::NotStarted) {
                     self.load_image_list(ctx);
                 }
+                // Images page needs artifacts to show artifact links
+                if matches!(self.artifacts.get(), LoadState::NotStarted) {
+                    self.load_artifacts(ctx);
+                }
             }
             Page::Artifacts => {
                 // Artifacts page needs artifacts list
@@ -1302,20 +1306,35 @@ impl eframe::App for FamilyPhotosApp {
                                     let mut min_visible = usize::MAX;
                                     let mut max_visible = 0usize;
 
+                                    // Build image-key -> artifact IDs lookup
+                                    let image_to_artifacts: HashMap<&str, Vec<u32>> = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
+                                        let mut map: HashMap<&str, Vec<u32>> = HashMap::new();
+                                        for artifact in artifacts {
+                                            let keys: Vec<&str> = std::iter::once(artifact.images.front1.as_str())
+                                                .chain(artifact.images.front2.as_deref())
+                                                .chain(artifact.images.back1.as_deref())
+                                                .collect();
+                                            for key in keys {
+                                                map.entry(key).or_default().push(artifact.id);
+                                            }
+                                        }
+                                        map
+                                    } else {
+                                        HashMap::new()
+                                    };
+
+                                    let mut navigate_to_artifact_id: Option<u32> = None;
+
                                     TableBuilder::new(ui)
                                         .striped(true)
                                         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                                         .column(Column::exact(100.0))
-                                        .column(Column::remainder().at_least(150.0))
                                         .column(Column::exact(120.0))
-                                        .column(Column::exact(100.0))
-                                        .column(Column::exact(150.0))
+                                        .column(Column::remainder().at_least(150.0))
                                         .header(30.0, |mut header| {
                                             header.col(|ui| { ui.strong("Thumbnail"); });
+                                            header.col(|ui| { ui.strong("Artifact"); });
                                             header.col(|ui| { ui.strong("Key"); });
-                                            header.col(|ui| { ui.strong("Date"); });
-                                            header.col(|ui| { ui.strong("Size"); });
-                                            header.col(|ui| { ui.strong("Tags"); });
                                         })
                                         .body(|body| {
                                             body.rows(thumbnail_height, filtered_images.len(), |mut row| {
@@ -1333,9 +1352,13 @@ impl eframe::App for FamilyPhotosApp {
                                                 row.col(|ui| {
                                                     if let Some(texture) = self.thumbnails.get(&image.key) {
                                                         let texture_size = texture.size_vec2();
+                                                        let max_width = 90.0;
+                                                        let max_height = thumbnail_height;
+                                                        let scale_x = max_width / texture_size.x;
+                                                        let scale_y = max_height / texture_size.y;
+                                                        let scale = scale_x.min(scale_y);
+                                                        let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
                                                         let aspect_ratio = texture_size.x / texture_size.y;
-                                                        let display_width = thumbnail_height * aspect_ratio;
-                                                        let display_size = Vec2::new(display_width.min(90.0), thumbnail_height);
 
                                                         let response = ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click().union(egui::Sense::hover())));
 
@@ -1372,25 +1395,22 @@ impl eframe::App for FamilyPhotosApp {
                                                 });
 
                                                 row.col(|ui| {
+                                                    if let Some(artifact_ids) = image_to_artifacts.get(image.key.as_str()) {
+                                                        for (i, &aid) in artifact_ids.iter().enumerate() {
+                                                            if i > 0 {
+                                                                ui.label(",");
+                                                            }
+                                                            if ui.link(format!("#{}", aid)).clicked() {
+                                                                navigate_to_artifact_id = Some(aid);
+                                                            }
+                                                        }
+                                                    } else {
+                                                        ui.label("—");
+                                                    }
+                                                });
+
+                                                row.col(|ui| {
                                                     if ui.button(&image.key).clicked() {
-                                                        clicked = true;
-                                                    }
-                                                });
-
-                                                row.col(|ui| {
-                                                    if ui.selectable_label(false, "—").clicked() {
-                                                        clicked = true;
-                                                    }
-                                                });
-
-                                                row.col(|ui| {
-                                                    if ui.selectable_label(false, "—").clicked() {
-                                                        clicked = true;
-                                                    }
-                                                });
-
-                                                row.col(|ui| {
-                                                    if ui.selectable_label(false, "—").clicked() {
                                                         clicked = true;
                                                     }
                                                 });
@@ -1400,6 +1420,10 @@ impl eframe::App for FamilyPhotosApp {
                                                 }
                                             });
                                         });
+
+                                    if let Some(aid) = navigate_to_artifact_id {
+                                        self.navigate_to_artifact(aid);
+                                    }
 
                                     // Update visible range for next frame
                                     if min_visible <= max_visible {
@@ -1473,6 +1497,7 @@ impl eframe::App for FamilyPhotosApp {
                                                 } else {
                                                     ui.label("Loading...");
                                                 }
+                                                ui.label(egui::RichText::new(&artifact.images.front1).weak().size(10.0));
                                             });
 
                                             // Front 2
@@ -1492,6 +1517,7 @@ impl eframe::App for FamilyPhotosApp {
                                                     } else {
                                                         ui.label("Loading...");
                                                     }
+                                                    ui.label(egui::RichText::new(front2.as_str()).weak().size(10.0));
                                                 });
                                             }
 
@@ -1512,6 +1538,7 @@ impl eframe::App for FamilyPhotosApp {
                                                     } else {
                                                         ui.label("Loading...");
                                                     }
+                                                    ui.label(egui::RichText::new(back1.as_str()).weak().size(10.0));
                                                 });
                                             }
                                         });
@@ -1664,6 +1691,7 @@ impl eframe::App for FamilyPhotosApp {
                                                 egui::TextEdit::singleline(tag_input)
                                                     .hint_text("Add a tag...")
                                                     .desired_width(200.0)
+                                                    .return_key(None)
                                             );
                                             if !tag_input.trim().is_empty() {
                                                 let query = tag_input.trim().to_lowercase();
@@ -1682,7 +1710,7 @@ impl eframe::App for FamilyPhotosApp {
                                                         });
                                                 }
                                             }
-                                            if tag_response.lost_focus()
+                                            if tag_response.has_focus()
                                                 && ui.input(|i| i.key_pressed(egui::Key::Enter))
                                                 && !tag_input.trim().is_empty()
                                             {
@@ -1704,6 +1732,7 @@ impl eframe::App for FamilyPhotosApp {
                                                 egui::TextEdit::singleline(people_input)
                                                     .hint_text("Add a person...")
                                                     .desired_width(200.0)
+                                                    .return_key(None)
                                             );
                                             if !people_input.trim().is_empty() {
                                                 let query = people_input.trim().to_lowercase();
@@ -1722,7 +1751,7 @@ impl eframe::App for FamilyPhotosApp {
                                                         });
                                                 }
                                             }
-                                            if people_response.lost_focus()
+                                            if people_response.has_focus()
                                                 && ui.input(|i| i.key_pressed(egui::Key::Enter))
                                                 && !people_input.trim().is_empty()
                                             {
