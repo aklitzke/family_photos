@@ -209,7 +209,9 @@ struct FamilyPhotosApp {
     toast_message: Option<(String, bool)>,     // (message, is_error)
     toast_timer: f64,                          // Timer for toast auto-dismiss
     search_query: String,
+    artifacts_search_query: String,
     images_visible_range: (usize, usize),      // (first, last) visible row indices
+    images_scroll_to_row: Option<usize>,         // Pending scroll-to-row for images table
     artifacts_visible_range: (usize, usize),   // (first, last) visible row indices
     update_date_state: HashMap<u32, String>,      // In-progress date edits per artifact
     update_comment_state: HashMap<u32, String>,  // In-progress comment edits per artifact
@@ -252,7 +254,9 @@ impl FamilyPhotosApp {
             toast_message: None,
             toast_timer: 0.0,
             search_query: String::new(),
+            artifacts_search_query: String::new(),
             images_visible_range: (0, 0),
+            images_scroll_to_row: None,
             artifacts_visible_range: (0, 0),
             update_date_state: HashMap::new(),
             update_comment_state: HashMap::new(),
@@ -837,6 +841,61 @@ impl FamilyPhotosApp {
 }
 
 /// Parse flexible date input into ISO 8601 partial date string.
+/// Check if an artifact matches a search query across all its content.
+fn artifact_matches_query(artifact: &Artifact, query: &str) -> bool {
+    // ID
+    if artifact.id.to_string().contains(query) {
+        return true;
+    }
+    // Image keys
+    if artifact.images.front1.to_lowercase().contains(query) {
+        return true;
+    }
+    if let Some(ref f2) = artifact.images.front2 {
+        if f2.to_lowercase().contains(query) { return true; }
+    }
+    if let Some(ref b1) = artifact.images.back1 {
+        if b1.to_lowercase().contains(query) { return true; }
+    }
+    // Derived fields
+    if let Some(date) = artifact_date(artifact) {
+        if date.to_lowercase().contains(query) || format_date_for_display(date).to_lowercase().contains(query) {
+            return true;
+        }
+    }
+    for tag in artifact_tags(artifact) {
+        if tag.to_lowercase().contains(query) { return true; }
+    }
+    for person in artifact_people(artifact) {
+        if person.to_lowercase().contains(query) { return true; }
+    }
+    if let Some(loc) = artifact_location(artifact) {
+        if loc.to_lowercase().contains(query) { return true; }
+    }
+    // All updates (comments, historical values)
+    for update in &artifact.updates {
+        if update.reason.to_lowercase().contains(query) { return true; }
+        if update.author.to_lowercase().contains(query) { return true; }
+        if let Some(ref date) = update.date {
+            if date.to_lowercase().contains(query) { return true; }
+        }
+        if let Some(ref tags) = update.tags {
+            for tag in tags {
+                if tag.to_lowercase().contains(query) { return true; }
+            }
+        }
+        if let Some(ref people) = update.people {
+            for person in people {
+                if person.to_lowercase().contains(query) { return true; }
+            }
+        }
+        if let Some(ref loc) = update.location {
+            if loc.to_lowercase().contains(query) { return true; }
+        }
+    }
+    false
+}
+
 /// Returns None for empty/whitespace input (clears date), Some(iso) for valid input.
 /// Returns Err for unparseable input.
 fn parse_fuzzy_date(input: &str) -> Result<Option<String>, String> {
@@ -997,6 +1056,10 @@ impl eframe::App for FamilyPhotosApp {
         if viewing_image && matches!(self.images.get(), LoadState::NotStarted) {
             self.load_image_list(ctx);
         }
+        // Image overlay needs artifacts to show artifact links
+        if viewing_image && matches!(self.artifacts.get(), LoadState::NotStarted) {
+            self.load_artifacts(ctx);
+        }
 
         // Update toast timer
         if self.toast_message.is_some() {
@@ -1069,6 +1132,39 @@ impl eframe::App for FamilyPhotosApp {
                             // Close button
                             if ui.button(egui::RichText::new("✕ Close").size(18.0)).clicked() {
                                 self.close_image_view();
+                            }
+
+                            ui.add_space(10.0);
+
+                            // View in context link
+                            if ui.link("View image in context").clicked() {
+                                if let LoadState::Loaded(images) = self.images.get() {
+                                    if let Some(idx) = images.iter().position(|img| img.key == selected_id) {
+                                        self.images_scroll_to_row = Some(idx);
+                                    }
+                                }
+                                self.zoom_controller.reset();
+                                self.navigate_to_page(Page::Images);
+                            }
+
+                            // Link to artifact(s) containing this image
+                            if let LoadState::Loaded(artifacts) = self.artifacts.get() {
+                                let linked: Vec<u32> = artifacts.iter()
+                                    .filter(|a| {
+                                        a.images.front1 == selected_id
+                                            || a.images.front2.as_deref() == Some(&selected_id)
+                                            || a.images.back1.as_deref() == Some(&selected_id)
+                                    })
+                                    .map(|a| a.id)
+                                    .collect();
+                                if !linked.is_empty() {
+                                    for aid in &linked {
+                                        if ui.link(format!("View artifact #{}", aid)).clicked() {
+                                            self.zoom_controller.reset();
+                                            self.navigate_to_artifact(*aid);
+                                        }
+                                    }
+                                }
                             }
 
                             ui.add_space(20.0);
@@ -1325,12 +1421,18 @@ impl eframe::App for FamilyPhotosApp {
 
                                     let mut navigate_to_artifact_id: Option<u32> = None;
 
-                                    TableBuilder::new(ui)
+                                    let mut table = TableBuilder::new(ui)
                                         .striped(true)
                                         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                                         .column(Column::exact(100.0))
                                         .column(Column::exact(120.0))
-                                        .column(Column::remainder().at_least(150.0))
+                                        .column(Column::remainder().at_least(150.0));
+
+                                    if let Some(row) = self.images_scroll_to_row.take() {
+                                        table = table.scroll_to_row(row, Some(egui::Align::Center));
+                                    }
+
+                                    table
                                         .header(30.0, |mut header| {
                                             header.col(|ui| { ui.strong("Thumbnail"); });
                                             header.col(|ui| { ui.strong("Artifact"); });
@@ -2007,8 +2109,39 @@ impl eframe::App for FamilyPhotosApp {
                                     LoadState::Loaded(artifacts) => {
                                         let thumbnail_height = 80.0;
 
+                                        // Search bar
+                                        ui.horizontal(|ui| {
+                                            ui.label("Search:");
+                                            ui.add(egui::TextEdit::singleline(&mut self.artifacts_search_query)
+                                                .hint_text("Filter artifacts...")
+                                                .desired_width(400.0));
+                                            if !self.artifacts_search_query.is_empty() {
+                                                if ui.button("Clear").clicked() {
+                                                    self.artifacts_search_query.clear();
+                                                }
+                                            }
+                                        });
+                                        ui.add_space(5.0);
+
+                                        // Filter artifacts by search query
+                                        let filtered_artifacts: Vec<&Artifact> = if self.artifacts_search_query.is_empty() {
+                                            artifacts.iter().collect()
+                                        } else {
+                                            let query = self.artifacts_search_query.to_lowercase();
+                                            artifacts.iter()
+                                                .filter(|a| artifact_matches_query(a, &query))
+                                                .collect()
+                                        };
+
+                                        if self.artifacts_search_query.is_empty() {
+                                            ui.label(format!("{} artifacts", filtered_artifacts.len()));
+                                        } else {
+                                            ui.label(format!("{} of {} artifacts", filtered_artifacts.len(), artifacts.len()));
+                                        }
+                                        ui.add_space(10.0);
+
                                         // Load front1 thumbnails only for visible rows + buffer of ~30 ahead
-                                        let total = artifacts.len();
+                                        let total = filtered_artifacts.len();
                                         let (raw_vis_start, raw_vis_end) = self.artifacts_visible_range;
                                         let (load_start, load_end) = if raw_vis_end > raw_vis_start && raw_vis_start < total {
                                             (raw_vis_start.saturating_sub(5), (raw_vis_end + 30).min(total))
@@ -2017,7 +2150,7 @@ impl eframe::App for FamilyPhotosApp {
                                         };
 
                                         if load_end > load_start {
-                                            let keys_to_load: Vec<String> = artifacts[load_start..load_end]
+                                            let keys_to_load: Vec<String> = filtered_artifacts[load_start..load_end]
                                                 .iter()
                                                 .map(|a| a.images.front1.clone())
                                                 .collect();
@@ -2048,9 +2181,9 @@ impl eframe::App for FamilyPhotosApp {
                                                 header.col(|ui| { ui.strong("Location"); });
                                             })
                                             .body(|body| {
-                                                body.rows(thumbnail_height, artifacts.len(), |mut row| {
+                                                body.rows(thumbnail_height, filtered_artifacts.len(), |mut row| {
                                                     let idx = row.index();
-                                                    let artifact = &artifacts[idx];
+                                                    let artifact = filtered_artifacts[idx];
                                                     let front_key = &artifact.images.front1;
                                                     let artifact_id = artifact.id;
                                                     let is_selected = selected_artifact == Some(artifact_id);

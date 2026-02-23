@@ -1446,6 +1446,15 @@ id = 271
 images.front1 = "Family History/Pile 8 Again/FastFoto_1916"
 images.back1 = "Family History/Pile 8 Again/FastFoto_1916_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:25:35Z"
+reason = "written on back, not sure who mary is, mary sue?"
+people = [
+    "Jeanette Jossi",
+    "Mary?",
+]
+
 [[artifacts]]
 id = 272
 images.front1 = "Family History/Pile 2 Again/FastFoto_1624"
@@ -6172,6 +6181,15 @@ images.front2 = "Family History/Pile 4 Again/FastFoto_0151"
 id = 1213
 images.front1 = "Family History/Pile 4 Again/FastFoto_0202"
 images.back1 = "Family History/Pile 4 Again/FastFoto_0202_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:15:04Z"
+reason = "that's us!"
+people = [
+    "Andrew Klitzke",
+    "Katherine Jossi",
+]
 
 [[artifacts]]
 id = 1214
@@ -12345,6 +12363,16 @@ images.front1 = "Family History/Pile 8/2025-12-26-23-21-0015"
 [[artifacts]]
 id = 2593
 images.front1 = "Family History/Pile 8/2025-12-26-23-21-0016"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:24:29Z"
+reason = "Mom in her college dorm?"
+tags = [
+    "college",
+    "dorm",
+]
+people = ["Jeanette Jossi"]
 
 [[artifacts]]
 id = 2594
@@ -20382,6 +20410,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1387_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1388"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1388_b"
@@ -23079,18 +23108,21 @@ key = "Family History/Pile 4 Again/FastFoto_0195_b"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0196"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0197"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0198"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0199"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0199_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0200"
@@ -23100,24 +23132,29 @@ key = "Family History/Pile 4 Again/FastFoto_0200_b"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0201"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0201_b"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0202"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0202_b"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0203"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0204"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0205"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0206"
@@ -25924,9 +25961,11 @@ key = "Family History/Pile 8 Again/FastFoto_1915_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1916"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1916_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1917"
