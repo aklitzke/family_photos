@@ -423,6 +423,13 @@ id = 73
 images.front1 = "Family History/Pile 7 Again/FastFoto_1743"
 images.back1 = "Family History/Pile 7 Again/FastFoto_1743_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:08:54Z"
+reason = "fountain in rome"
+date = "2009-01"
+tags = ["rome"]
+
 [[artifacts]]
 id = 74
 images.front1 = "Family History/Pile 3 Again/FastFoto_0111_a"
@@ -4519,6 +4526,16 @@ id = 881
 images.front1 = "Family History/Pile 6 Again/FastFoto_1708"
 images.back1 = "Family History/Pile 6 Again/FastFoto_1708_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:07:32Z"
+reason = "printed on back, that's gma's kitchen"
+date = "1994-06"
+people = ["Laura Klitzke"]
+location = """
+Jossi Family House
+Neenah, WI"""
+
 [[artifacts]]
 id = 882
 images.front1 = "Family History/Pile 27 Picture Book/FastFoto_1262"
@@ -5678,6 +5695,18 @@ images.back1 = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0937_b"
 [[artifacts]]
 id = 1112
 images.front1 = "Family History/Pile 4 Again/FastFoto_0190"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:18:41Z"
+reason = "looks like that house"
+people = [
+    "Andrew Klitzke",
+    "Ben Jossi",
+]
+location = """
+Jossi Family House
+Neenah, WI"""
 
 [[artifacts]]
 id = 1113
@@ -7631,6 +7660,15 @@ images.back1 = "Family History/Pile 18 Florida Box/FastFoto_0692_b"
 id = 1493
 images.front1 = "Family History/Pile 8 Again/FastFoto_1914"
 images.back1 = "Family History/Pile 8 Again/FastFoto_1914_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:20:43Z"
+reason = "That painting was in their house"
+people = ["Jeanette Jossi"]
+location = """
+Jossi Family House
+Neenah, WI"""
 
 [[artifacts]]
 id = 1494
@@ -13819,6 +13857,7 @@ key = "Family History/Pile 12/FastFoto_0444_b"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0445"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0445_b"
@@ -16227,6 +16266,7 @@ key = "Family History/Pile 2 Again/FastFoto_1691_b"
 
 [[images]]
 key = "Family History/Pile 2 Again/FastFoto_1692"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 2 Again/FastFoto_1692_b"
@@ -17779,9 +17819,11 @@ key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0957_b"
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0958"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0958_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_0959"
@@ -20226,9 +20268,11 @@ key = "Family History/Pile 27 Picture Book/FastFoto_1341_b"
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1342"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1342_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1343"
@@ -20391,6 +20435,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1371_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1372"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1372_b"
@@ -21050,6 +21095,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1522_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1523"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1523_b"
@@ -21906,12 +21952,15 @@ key = "Family History/Pile 3 Again/FastFoto_0055_b"
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0056"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0056_a"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0056_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0060"
@@ -22379,12 +22428,15 @@ key = "Family History/Pile 3 Again/FastFoto_0126_b"
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0127"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0127_a"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0127_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 3 Again/FastFoto_0128"
@@ -23161,6 +23213,7 @@ key = "Family History/Pile 4 Again/FastFoto_0189_b"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0190"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0191"
@@ -23196,6 +23249,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0199"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0199_b"
@@ -23422,6 +23476,7 @@ key = "Family History/Pile 4 Again/FastFoto_0248"
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0249"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0250"
@@ -24508,6 +24563,7 @@ key = "Family History/Pile 7 Again/FastFoto_1743"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1743_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1744"
@@ -24668,6 +24724,7 @@ key = "Family History/Pile 7 Again/FastFoto_1769_b"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1770"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1770_b"
@@ -25916,6 +25973,7 @@ key = "Family History/Pile 8 Again/FastFoto_1893_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1894"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1894_b"
@@ -25934,12 +25992,15 @@ key = "Family History/Pile 8 Again/FastFoto_1896_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1897"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1897_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1898"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1898_b"
@@ -25964,6 +26025,7 @@ key = "Family History/Pile 8 Again/FastFoto_1901_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1902"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1902_b"
@@ -25976,6 +26038,7 @@ key = "Family History/Pile 8 Again/FastFoto_1903_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1904"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1904_b"
@@ -25988,6 +26051,7 @@ key = "Family History/Pile 8 Again/FastFoto_1905_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1906"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1906_b"
@@ -26030,12 +26094,14 @@ key = "Family History/Pile 8 Again/FastFoto_1912_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1913"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1913_b"
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1914"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 8 Again/FastFoto_1914_b"

@@ -1777,8 +1777,8 @@ impl eframe::App for FamilyPhotosApp {
 
                                         let is_updating = self.update_in_progress.get(&artifact_id).copied().unwrap_or(false);
 
-                                        // Collect all known tags and people for autocomplete
-                                        let (all_tags, all_people): (Vec<String>, Vec<String>) = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
+                                        // Collect all known tags, people, and locations for autocomplete
+                                        let (all_tags, all_people, all_locations): (Vec<String>, Vec<String>, Vec<String>) = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
                                             let mut tags: Vec<String> = artifacts.iter()
                                                 .flat_map(|a| artifact_tags(a).iter().cloned())
                                                 .collect();
@@ -1789,9 +1789,14 @@ impl eframe::App for FamilyPhotosApp {
                                                 .collect();
                                             people.sort();
                                             people.dedup();
-                                            (tags, people)
+                                            let mut locations: Vec<String> = artifacts.iter()
+                                                .filter_map(|a| artifact_location(a).map(|s| s.to_string()))
+                                                .collect();
+                                            locations.sort();
+                                            locations.dedup();
+                                            (tags, people, locations)
                                         } else {
-                                            (Vec::new(), Vec::new())
+                                            (Vec::new(), Vec::new(), Vec::new())
                                         };
 
                                         let mut save_clicked = false;
@@ -1910,6 +1915,23 @@ impl eframe::App for FamilyPhotosApp {
                                                     .desired_width(250.0)
                                                     .desired_rows(2)
                                             );
+                                            if !location_text.trim().is_empty() {
+                                                let query = location_text.trim().to_lowercase();
+                                                let suggestions: Vec<&String> = all_locations.iter()
+                                                    .filter(|l| l.to_lowercase().contains(&query) && l.as_str() != location_text.trim())
+                                                    .take(5)
+                                                    .collect();
+                                                if !suggestions.is_empty() {
+                                                    egui::Frame::popup(ui.style())
+                                                        .show(ui, |ui| {
+                                                            for s in &suggestions {
+                                                                if ui.selectable_label(false, s.as_str()).clicked() {
+                                                                    *location_text = (*s).clone();
+                                                                }
+                                                            }
+                                                        });
+                                                }
+                                            }
 
                                             ui.add_space(5.0);
 
