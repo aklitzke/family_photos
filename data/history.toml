@@ -381,10 +381,12 @@ images.front1 = "Family History/Pile 1/2025-12-24-12-13-0011"
 [[artifacts]]
 id = 64
 images.front1 = "Family History/Pile 1/2025-12-24-12-13-0012"
+images.front2 = "Family History/Pile 1/2025-12-24-12-13-0013"
 
-[[artifacts]]
-id = 65
-images.front1 = "Family History/Pile 1/2025-12-24-12-13-0013"
+[[artifacts.updates]]
+author = "system"
+updated = "2026-02-23T03:08:48Z"
+reason = "Merged artifact #65 into this artifact"
 
 [[artifacts]]
 id = 66
@@ -412,6 +414,13 @@ images.back1 = "Family History/Pile 12/FastFoto_0384_b"
 id = 71
 images.front1 = "Family History/Pile 27 Picture Book/FastFoto_1231"
 images.back1 = "Family History/Pile 27 Picture Book/FastFoto_1231_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:10:46Z"
+reason = "thats me!"
+date = "1994"
+people = ["Andrew Klitzke"]
 
 [[artifacts]]
 id = 72

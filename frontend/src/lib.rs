@@ -223,6 +223,7 @@ struct FamilyPhotosApp {
     update_in_progress: HashMap<u32, bool>,      // Track artifacts being updated
     update_promises: HashMap<u32, Arc<Mutex<LoadState<UpdateArtifactResponse>>>>,
     update_validation_error: HashMap<u32, String>, // Inline validation feedback
+    update_metadata_expanded: HashMap<u32, bool>,  // Whether metadata fields are shown
     // Merge state
     merge_mode_leader: Option<u32>,
     merge_follower_search: String,
@@ -275,6 +276,7 @@ impl FamilyPhotosApp {
             update_in_progress: HashMap::new(),
             update_promises: HashMap::new(),
             update_validation_error: HashMap::new(),
+            update_metadata_expanded: HashMap::new(),
             merge_mode_leader: None,
             merge_follower_search: String::new(),
             merge_selected_follower: None,
@@ -1747,16 +1749,16 @@ impl eframe::App for FamilyPhotosApp {
                                         ui.separator();
                                         ui.add_space(10.0);
 
-                                        // Update form
-                                        ui.label(egui::RichText::new("Log an update:").strong());
+                                        // Comment form
+                                        ui.label(egui::RichText::new("Add a comment:").strong());
                                         ui.add_space(5.0);
 
                                         // Initialize edit states
-                                        if !self.update_date_state.contains_key(&artifact_id) {
-                                            self.update_date_state.insert(artifact_id, String::new());
-                                        }
                                         if !self.update_comment_state.contains_key(&artifact_id) {
                                             self.update_comment_state.insert(artifact_id, String::new());
+                                        }
+                                        if !self.update_date_state.contains_key(&artifact_id) {
+                                            self.update_date_state.insert(artifact_id, String::new());
                                         }
                                         if !self.update_tag_input.contains_key(&artifact_id) {
                                             self.update_tag_input.insert(artifact_id, String::new());
@@ -1805,8 +1807,8 @@ impl eframe::App for FamilyPhotosApp {
                                         let mut person_to_add: Option<String> = None;
                                         let mut person_to_remove: Option<String> = None;
 
-                                        let date_text = self.update_date_state.get_mut(&artifact_id).unwrap();
                                         let comment_text = self.update_comment_state.get_mut(&artifact_id).unwrap();
+                                        let date_text = self.update_date_state.get_mut(&artifact_id).unwrap();
                                         let tag_input = self.update_tag_input.get_mut(&artifact_id).unwrap();
                                         let pending_tags = self.update_tags_pending.get_mut(&artifact_id).unwrap();
                                         let people_input = self.update_people_input.get_mut(&artifact_id).unwrap();
@@ -1814,134 +1816,154 @@ impl eframe::App for FamilyPhotosApp {
                                         let location_text = self.update_location_state.get_mut(&artifact_id).unwrap();
 
                                         ui.add_enabled_ui(!is_updating, |ui| {
-                                            ui.horizontal(|ui| {
-                                                ui.label("Date:");
-                                                ui.add(
-                                                    egui::TextEdit::singleline(date_text)
-                                                        .hint_text("e.g. 2020, 12/2020, 02/05/2020")
-                                                        .desired_width(200.0)
-                                                );
-                                            });
-
-                                            ui.add_space(5.0);
-
-                                            // Tags editing
-                                            ui.label("Tags:");
-                                            ui.horizontal_wrapped(|ui| {
-                                                for tag in pending_tags.iter() {
-                                                    if ui.button(format!("{} ✕", tag)).clicked() {
-                                                        tag_to_remove = Some(tag.clone());
-                                                    }
-                                                }
-                                            });
-                                            let tag_response = ui.add(
-                                                egui::TextEdit::singleline(tag_input)
-                                                    .hint_text("Add a tag...")
-                                                    .desired_width(200.0)
-                                                    .return_key(None)
-                                            );
-                                            if !tag_input.trim().is_empty() {
-                                                let query = tag_input.trim().to_lowercase();
-                                                let suggestions: Vec<&String> = all_tags.iter()
-                                                    .filter(|t| t.to_lowercase().contains(&query) && !pending_tags.contains(t))
-                                                    .take(5)
-                                                    .collect();
-                                                if !suggestions.is_empty() {
-                                                    egui::Frame::popup(ui.style())
-                                                        .show(ui, |ui| {
-                                                            for s in &suggestions {
-                                                                if ui.selectable_label(false, s.as_str()).clicked() {
-                                                                    tag_to_add = Some((*s).clone());
-                                                                }
-                                                            }
-                                                        });
-                                                }
-                                            }
-                                            if tag_response.has_focus()
-                                                && ui.input(|i| i.key_pressed(egui::Key::Enter))
-                                                && !tag_input.trim().is_empty()
-                                            {
-                                                tag_to_add = Some(tag_input.trim().to_lowercase().to_string());
-                                            }
-
-                                            ui.add_space(5.0);
-
-                                            // People editing
-                                            ui.label("People:");
-                                            ui.horizontal_wrapped(|ui| {
-                                                for person in pending_people.iter() {
-                                                    if ui.button(format!("{} ✕", person)).clicked() {
-                                                        person_to_remove = Some(person.clone());
-                                                    }
-                                                }
-                                            });
-                                            let people_response = ui.add(
-                                                egui::TextEdit::singleline(people_input)
-                                                    .hint_text("Add a person...")
-                                                    .desired_width(200.0)
-                                                    .return_key(None)
-                                            );
-                                            if !people_input.trim().is_empty() {
-                                                let query = people_input.trim().to_lowercase();
-                                                let suggestions: Vec<&String> = all_people.iter()
-                                                    .filter(|p| p.to_lowercase().contains(&query) && !pending_people.contains(p))
-                                                    .take(5)
-                                                    .collect();
-                                                if !suggestions.is_empty() {
-                                                    egui::Frame::popup(ui.style())
-                                                        .show(ui, |ui| {
-                                                            for s in &suggestions {
-                                                                if ui.selectable_label(false, s.as_str()).clicked() {
-                                                                    person_to_add = Some((*s).clone());
-                                                                }
-                                                            }
-                                                        });
-                                                }
-                                            }
-                                            if people_response.has_focus()
-                                                && ui.input(|i| i.key_pressed(egui::Key::Enter))
-                                                && !people_input.trim().is_empty()
-                                            {
-                                                person_to_add = Some(people_input.trim().to_string());
-                                            }
-
-                                            ui.add_space(5.0);
-
-                                            // Location editing
-                                            ui.label("Location:");
-                                            ui.add(
-                                                egui::TextEdit::multiline(location_text)
-                                                    .hint_text("e.g. 123 Main St, Springfield")
-                                                    .desired_width(250.0)
-                                                    .desired_rows(2)
-                                            );
-                                            if !location_text.trim().is_empty() {
-                                                let query = location_text.trim().to_lowercase();
-                                                let suggestions: Vec<&String> = all_locations.iter()
-                                                    .filter(|l| l.to_lowercase().contains(&query) && l.as_str() != location_text.trim())
-                                                    .take(5)
-                                                    .collect();
-                                                if !suggestions.is_empty() {
-                                                    egui::Frame::popup(ui.style())
-                                                        .show(ui, |ui| {
-                                                            for s in &suggestions {
-                                                                if ui.selectable_label(false, s.as_str()).clicked() {
-                                                                    *location_text = (*s).clone();
-                                                                }
-                                                            }
-                                                        });
-                                                }
-                                            }
-
-                                            ui.add_space(5.0);
-
-                                            ui.label("Comment:");
+                                            // Comment first
                                             ui.add(
                                                 egui::TextEdit::multiline(comment_text)
-                                                    .hint_text("Why are you making this change?")
+                                                    .hint_text("Add a comment...")
                                                     .desired_width(250.0)
                                                     .desired_rows(3)
                                             );
+
+                                            ui.add_space(5.0);
+
+                                            // Metadata toggle
+                                            let metadata_expanded = self.update_metadata_expanded
+                                                .entry(artifact_id).or_insert(false);
+                                            let toggle_text = if *metadata_expanded {
+                                                "Hide metadata (date, tags, people, location)"
+                                            } else {
+                                                "Edit metadata (date, tags, people, location)"
+                                            };
+                                            if ui.button(toggle_text).clicked() {
+                                                *metadata_expanded = !*metadata_expanded;
+                                            }
+
+                                            if *metadata_expanded {
+                                                ui.add_space(5.0);
+                                                ui.label(egui::RichText::new("All metadata fields are optional.").weak().italics());
+                                                ui.add_space(5.0);
+
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Date:");
+                                                    ui.add(
+                                                        egui::TextEdit::singleline(date_text)
+                                                            .hint_text("e.g. 2020, 12/2020, 02/05/2020")
+                                                            .desired_width(200.0)
+                                                    );
+                                                });
+
+                                                ui.add_space(5.0);
+
+                                                // Tags editing
+                                                ui.label("Tags:");
+                                                ui.horizontal_wrapped(|ui| {
+                                                    for tag in pending_tags.iter() {
+                                                        if ui.button(format!("{} ✕", tag)).clicked() {
+                                                            tag_to_remove = Some(tag.clone());
+                                                        }
+                                                    }
+                                                });
+                                                let tag_response = ui.add(
+                                                    egui::TextEdit::singleline(tag_input)
+                                                        .hint_text("Add a tag...")
+                                                        .desired_width(200.0)
+                                                        .return_key(None)
+                                                );
+                                                if !tag_input.trim().is_empty() {
+                                                    let query = tag_input.trim().to_lowercase();
+                                                    let suggestions: Vec<&String> = all_tags.iter()
+                                                        .filter(|t| t.to_lowercase().contains(&query) && !pending_tags.contains(t))
+                                                        .take(5)
+                                                        .collect();
+                                                    if !suggestions.is_empty() {
+                                                        egui::Frame::popup(ui.style())
+                                                            .show(ui, |ui| {
+                                                                for s in &suggestions {
+                                                                    if ui.selectable_label(false, s.as_str()).clicked() {
+                                                                        tag_to_add = Some((*s).clone());
+                                                                    }
+                                                                }
+                                                            });
+                                                    }
+                                                }
+                                                if tag_response.has_focus()
+                                                    && ui.input(|i| i.key_pressed(egui::Key::Enter))
+                                                    && !tag_input.trim().is_empty()
+                                                {
+                                                    tag_to_add = Some(tag_input.trim().to_lowercase().to_string());
+                                                }
+
+                                                ui.add_space(5.0);
+
+                                                // People editing
+                                                ui.label("People:");
+                                                ui.horizontal_wrapped(|ui| {
+                                                    for person in pending_people.iter() {
+                                                        if ui.button(format!("{} ✕", person)).clicked() {
+                                                            person_to_remove = Some(person.clone());
+                                                        }
+                                                    }
+                                                });
+                                                let people_response = ui.add(
+                                                    egui::TextEdit::singleline(people_input)
+                                                        .hint_text("Add a person...")
+                                                        .desired_width(200.0)
+                                                        .return_key(None)
+                                                );
+                                                if !people_input.trim().is_empty() {
+                                                    let query = people_input.trim().to_lowercase();
+                                                    let suggestions: Vec<&String> = all_people.iter()
+                                                        .filter(|p| p.to_lowercase().contains(&query) && !pending_people.contains(p))
+                                                        .take(5)
+                                                        .collect();
+                                                    if !suggestions.is_empty() {
+                                                        egui::Frame::popup(ui.style())
+                                                            .show(ui, |ui| {
+                                                                for s in &suggestions {
+                                                                    if ui.selectable_label(false, s.as_str()).clicked() {
+                                                                        person_to_add = Some((*s).clone());
+                                                                    }
+                                                                }
+                                                            });
+                                                    }
+                                                }
+                                                if people_response.has_focus()
+                                                    && ui.input(|i| i.key_pressed(egui::Key::Enter))
+                                                    && !people_input.trim().is_empty()
+                                                {
+                                                    person_to_add = Some(people_input.trim().to_string());
+                                                }
+
+                                                ui.add_space(5.0);
+
+                                                // Location editing
+                                                ui.label("Location:");
+                                                ui.add(
+                                                    egui::TextEdit::multiline(location_text)
+                                                        .hint_text("e.g. 123 Main St, Springfield")
+                                                        .desired_width(250.0)
+                                                        .desired_rows(2)
+                                                );
+                                                if !location_text.trim().is_empty() {
+                                                    let query = location_text.trim().to_lowercase();
+                                                    let suggestions: Vec<&String> = all_locations.iter()
+                                                        .filter(|l| l.to_lowercase().contains(&query) && l.as_str() != location_text.trim())
+                                                        .take(5)
+                                                        .collect();
+                                                    if !suggestions.is_empty() {
+                                                        egui::Frame::popup(ui.style())
+                                                            .show(ui, |ui| {
+                                                                for s in &suggestions {
+                                                                    if ui.selectable_label(false, s.as_str()).clicked() {
+                                                                        *location_text = (*s).clone();
+                                                                    }
+                                                                }
+                                                            });
+                                                    }
+                                                }
+                                            }
+
+                                            ui.add_space(5.0);
 
                                             if ui.button("Save").clicked() {
                                                 save_clicked = true;
@@ -2017,11 +2039,7 @@ impl eframe::App for FamilyPhotosApp {
                                             let current_loc = artifact_location(&artifact).unwrap_or("");
                                             let location_changed = loc_input.trim() != current_loc;
 
-                                            let has_any_change = has_date || tags_changed || people_changed || location_changed;
-
-                                            if !has_any_change {
-                                                self.update_validation_error.insert(artifact_id, "At least one field must be changed".to_string());
-                                            } else if comment_input.trim().is_empty() {
+                                            if comment_input.trim().is_empty() {
                                                 self.update_validation_error.insert(artifact_id, "Comment is required".to_string());
                                             } else {
                                                 let mut date_parse_error = false;
@@ -2057,6 +2075,7 @@ impl eframe::App for FamilyPhotosApp {
                                                     self.update_people_input.remove(&artifact_id);
                                                     self.update_people_pending.remove(&artifact_id);
                                                     self.update_location_state.remove(&artifact_id);
+                                                    self.update_metadata_expanded.remove(&artifact_id);
                                                     self.start_artifact_update(
                                                         artifact_id,
                                                         comment_input.trim().to_string(),
@@ -2085,7 +2104,7 @@ impl eframe::App for FamilyPhotosApp {
                                     ui.separator();
                                     ui.add_space(10.0);
 
-                                    ui.heading(egui::RichText::new("History").size(20.0));
+                                    ui.heading(egui::RichText::new("Comments").size(20.0));
                                     ui.add_space(10.0);
 
                                     // Show updates in reverse chronological order
