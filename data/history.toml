@@ -5888,6 +5888,15 @@ id = 1147
 images.front1 = "Family History/Pile 12/FastFoto_0450"
 images.back1 = "Family History/Pile 12/FastFoto_0450_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:28:34Z"
+reason = "that's our upstairs lol"
+people = ["Laura Klitzke"]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 1148
 images.front1 = "Family History/Pile 6 Again/FastFoto_1716"
@@ -5972,6 +5981,13 @@ images.back1 = "Family History/Pile 28 Chocolate Box/FastFoto_1523_b"
 id = 1164
 images.front1 = "Family History/Pile 28 Chocolate Box/FastFoto_1594"
 images.back1 = "Family History/Pile 28 Chocolate Box/FastFoto_1594_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:25:15Z"
+reason = "I think this was first grade? I kinda remember that shirt lol"
+date = "1996"
+people = ["Andrew Klitzke"]
 
 [[artifacts]]
 id = 1165
@@ -13591,9 +13607,11 @@ key = "Family History/Pile 12/FastFoto_0400_b"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0401"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0401_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0402"
@@ -13888,6 +13906,7 @@ key = "Family History/Pile 12/FastFoto_0449_b"
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0450"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0450_b"
@@ -15596,12 +15615,14 @@ key = "Family History/Pile 18 Florida Box/FastFoto_0731_b"
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0732"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0732_b"
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0733"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0733_b"
@@ -16962,6 +16983,7 @@ key = "Family History/Pile 21 Lakewood Box/FastFoto_0819"
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0819_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 21 Lakewood Box/FastFoto_0820"
@@ -18430,9 +18452,11 @@ key = "Family History/Pile 24 Envelope/FastFoto_1057_b"
 
 [[images]]
 key = "Family History/Pile 24 Envelope/FastFoto_1058"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 24 Envelope/FastFoto_1058_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 24 Envelope/FastFoto_1059"
@@ -18442,6 +18466,7 @@ key = "Family History/Pile 24 Envelope/FastFoto_1059_b"
 
 [[images]]
 key = "Family History/Pile 24 Envelope/FastFoto_1060"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 24 Envelope/FastFoto_1060_b"
@@ -20611,9 +20636,11 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1400_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1401"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1401_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1402"
@@ -21264,6 +21291,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1550_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1551"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1551_b"
@@ -21324,6 +21352,7 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1560_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1561"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1561_b"
@@ -21523,9 +21552,11 @@ key = "Family History/Pile 28 Chocolate Box/FastFoto_1593_b"
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1594"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1594_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 28 Chocolate Box/FastFoto_1595"
