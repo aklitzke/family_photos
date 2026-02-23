@@ -19,13 +19,72 @@ pub struct HealthResponse {
     pub message: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ArtifactImages {
-    pub front1: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub front2: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub back1: Option<String>,
+    pub fronts: Vec<String>,  // fronts[0] = front1, fronts[1] = front2, etc.
+    pub backs: Vec<String>,   // backs[0] = back1, backs[1] = back2, etc.
+}
+
+impl ArtifactImages {
+    /// The primary front image (always present).
+    pub fn front1(&self) -> &str {
+        &self.fronts[0]
+    }
+
+    /// All image keys (fronts then backs).
+    pub fn all_keys(&self) -> Vec<&str> {
+        self.fronts.iter().map(|s| s.as_str())
+            .chain(self.backs.iter().map(|s| s.as_str()))
+            .collect()
+    }
+}
+
+impl Serialize for ArtifactImages {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let count = self.fronts.len() + self.backs.len();
+        let mut map = serializer.serialize_map(Some(count))?;
+        for (i, front) in self.fronts.iter().enumerate() {
+            map.serialize_entry(&format!("front{}", i + 1), front)?;
+        }
+        for (i, back) in self.backs.iter().enumerate() {
+            map.serialize_entry(&format!("back{}", i + 1), back)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for ArtifactImages {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
+
+        let mut fronts: Vec<(usize, String)> = Vec::new();
+        let mut backs: Vec<(usize, String)> = Vec::new();
+
+        for (key, value) in &map {
+            if let Some(num_str) = key.strip_prefix("front") {
+                if let Ok(num) = num_str.parse::<usize>() {
+                    fronts.push((num, value.clone()));
+                }
+            } else if let Some(num_str) = key.strip_prefix("back") {
+                if let Ok(num) = num_str.parse::<usize>() {
+                    backs.push((num, value.clone()));
+                }
+            }
+        }
+
+        fronts.sort_by_key(|(n, _)| *n);
+        backs.sort_by_key(|(n, _)| *n);
+
+        let fronts: Vec<String> = fronts.into_iter().map(|(_, v)| v).collect();
+        let backs: Vec<String> = backs.into_iter().map(|(_, v)| v).collect();
+
+        if fronts.is_empty() {
+            return Err(serde::de::Error::custom("ArtifactImages requires at least front1"));
+        }
+
+        Ok(ArtifactImages { fronts, backs })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -137,6 +196,18 @@ pub struct UpdateArtifactResponse {
 pub struct ErrorResponse {
     pub error: String,
     pub error_type: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MergeArtifactsRequest {
+    pub leader_id: u32,
+    pub follower_id: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MergeArtifactsResponse {
+    pub success: bool,
+    pub merged_artifact: Artifact,
 }
 
 /// Formats HistoryData to TOML string with proper formatting

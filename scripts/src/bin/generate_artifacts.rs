@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let existing_artifact_keys: HashSet<String> = history
         .artifacts
         .iter()
-        .map(|artifact| artifact.images.front1.clone())
+        .map(|artifact| artifact.images.front1().to_string())
         .collect();
 
     // Group FastFoto images by their base path and number
@@ -123,10 +123,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Artifact {
                     id: next_id,
                     images: ArtifactImages {
-                        front1: variant_a.clone(),
-                        front2: base_opt.clone(),
-                        back1: back_opt.clone(),
+                        fronts: std::iter::once(variant_a.clone())
+                            .chain(base_opt.clone())
+                            .collect(),
+                        backs: back_opt.clone().into_iter().collect(),
                     },
+                    updates: vec![],
                 }
             }
 
@@ -150,10 +152,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Artifact {
                     id: next_id,
                     images: ArtifactImages {
-                        front1: base.clone(),
-                        front2: None,
-                        back1: back_opt.clone(),
+                        fronts: vec![base.clone()],
+                        backs: back_opt.clone().into_iter().collect(),
                     },
+                    updates: vec![],
                 }
             }
 
@@ -171,10 +173,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Artifact {
                     id: next_id,
                     images: ArtifactImages {
-                        front1: variant_b.clone(),
-                        front2: None,
-                        back1: None,
+                        fronts: vec![variant_b.clone()],
+                        backs: vec![],
                     },
+                    updates: vec![],
                 }
             }
 
@@ -209,10 +211,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         new_artifacts.push(Artifact {
             id: next_id,
             images: ArtifactImages {
-                front1: timestamp_key,
-                front2: None,
-                back1: None,
+                fronts: vec![timestamp_key],
+                backs: vec![],
             },
+            updates: vec![],
         });
 
         next_id += 1;

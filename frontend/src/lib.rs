@@ -1,4 +1,4 @@
-use common::{artifact_date, artifact_location, artifact_people, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
+use common::{artifact_date, artifact_location, artifact_people, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -223,6 +223,13 @@ struct FamilyPhotosApp {
     update_in_progress: HashMap<u32, bool>,      // Track artifacts being updated
     update_promises: HashMap<u32, Arc<Mutex<LoadState<UpdateArtifactResponse>>>>,
     update_validation_error: HashMap<u32, String>, // Inline validation feedback
+    // Merge state
+    merge_mode_leader: Option<u32>,
+    merge_follower_search: String,
+    merge_selected_follower: Option<u32>,
+    merge_confirm_input: String,
+    merge_in_progress: bool,
+    merge_promise: Option<Arc<Mutex<LoadState<MergeArtifactsResponse>>>>,
 }
 
 impl FamilyPhotosApp {
@@ -268,6 +275,12 @@ impl FamilyPhotosApp {
             update_in_progress: HashMap::new(),
             update_promises: HashMap::new(),
             update_validation_error: HashMap::new(),
+            merge_mode_leader: None,
+            merge_follower_search: String::new(),
+            merge_selected_follower: None,
+            merge_confirm_input: String::new(),
+            merge_in_progress: false,
+            merge_promise: None,
         }
     }
 
@@ -838,6 +851,79 @@ impl FamilyPhotosApp {
             }
         }
     }
+
+    fn start_merge(&mut self, leader_id: u32, follower_id: u32) {
+        self.merge_in_progress = true;
+
+        let loading_state = Arc::new(Mutex::new(LoadState::Loading));
+        self.merge_promise = Some(loading_state.clone());
+
+        let request = MergeArtifactsRequest {
+            leader_id,
+            follower_id,
+        };
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = send_merge_request(request).await;
+            let new_state = match result {
+                Ok(response) => LoadState::Loaded(response),
+                Err(error) => LoadState::Failed(error),
+            };
+            if let Ok(mut state) = loading_state.lock() {
+                *state = new_state;
+            }
+        });
+    }
+
+    fn process_merge(&mut self) {
+        let result = if let Some(state_arc) = &self.merge_promise {
+            if let Ok(state) = state_arc.lock() {
+                match &*state {
+                    LoadState::Loaded(response) => Some(Ok(response.clone())),
+                    LoadState::Failed(error) => Some(Err(error.clone())),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(result) = result {
+            self.merge_promise = None;
+            self.merge_in_progress = false;
+
+            match result {
+                Ok(response) => {
+                    let leader_id = response.merged_artifact.id;
+                    // Update local artifacts: replace leader, remove follower
+                    if let LoadState::Loaded(artifacts) = &mut self.artifacts.state {
+                        if let Some(a) = artifacts.iter_mut().find(|a| a.id == leader_id) {
+                            *a = response.merged_artifact;
+                        }
+                        if let Some(follower_id) = self.merge_selected_follower {
+                            artifacts.retain(|a| a.id != follower_id);
+                        }
+                    }
+                    self.toast_message = Some(("Artifacts merged successfully".to_string(), false));
+                    self.toast_timer = 0.0;
+                    // Reset merge state
+                    self.merge_mode_leader = None;
+                    self.merge_follower_search.clear();
+                    self.merge_selected_follower = None;
+                    self.merge_confirm_input.clear();
+                }
+                Err(error) => {
+                    self.toast_message = Some((
+                        format!("Failed to merge: {}", error),
+                        true,
+                    ));
+                    self.toast_timer = 0.0;
+                }
+            }
+        }
+    }
 }
 
 /// Parse flexible date input into ISO 8601 partial date string.
@@ -848,14 +934,8 @@ fn artifact_matches_query(artifact: &Artifact, query: &str) -> bool {
         return true;
     }
     // Image keys
-    if artifact.images.front1.to_lowercase().contains(query) {
-        return true;
-    }
-    if let Some(ref f2) = artifact.images.front2 {
-        if f2.to_lowercase().contains(query) { return true; }
-    }
-    if let Some(ref b1) = artifact.images.back1 {
-        if b1.to_lowercase().contains(query) { return true; }
+    for key in artifact.images.all_keys() {
+        if key.to_lowercase().contains(query) { return true; }
     }
     // Derived fields
     if let Some(date) = artifact_date(artifact) {
@@ -1019,6 +1099,7 @@ impl eframe::App for FamilyPhotosApp {
         self.health.process();
         self.process_rotation_updates();
         self.process_artifact_updates();
+        self.process_merge();
 
         // Auto-load data based on current page/view
         let current_page = self.get_current_page();
@@ -1150,11 +1231,7 @@ impl eframe::App for FamilyPhotosApp {
                             // Link to artifact(s) containing this image
                             if let LoadState::Loaded(artifacts) = self.artifacts.get() {
                                 let linked: Vec<u32> = artifacts.iter()
-                                    .filter(|a| {
-                                        a.images.front1 == selected_id
-                                            || a.images.front2.as_deref() == Some(&selected_id)
-                                            || a.images.back1.as_deref() == Some(&selected_id)
-                                    })
+                                    .filter(|a| a.images.all_keys().contains(&selected_id.as_str()))
                                     .map(|a| a.id)
                                     .collect();
                                 if !linked.is_empty() {
@@ -1406,11 +1483,7 @@ impl eframe::App for FamilyPhotosApp {
                                     let image_to_artifacts: HashMap<&str, Vec<u32>> = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
                                         let mut map: HashMap<&str, Vec<u32>> = HashMap::new();
                                         for artifact in artifacts {
-                                            let keys: Vec<&str> = std::iter::once(artifact.images.front1.as_str())
-                                                .chain(artifact.images.front2.as_deref())
-                                                .chain(artifact.images.back1.as_deref())
-                                                .collect();
-                                            for key in keys {
+                                            for key in artifact.images.all_keys() {
                                                 map.entry(key).or_default().push(artifact.id);
                                             }
                                         }
@@ -1564,83 +1637,50 @@ impl eframe::App for FamilyPhotosApp {
                                         ui.heading(egui::RichText::new(format!("Artifact #{}", artifact_id)).size(32.0));
                                         ui.add_space(20.0);
 
-                                        // Collect all image keys
-                                        let mut image_keys = vec![artifact.images.front1.clone()];
-                                        if let Some(front2) = &artifact.images.front2 {
-                                            image_keys.push(front2.clone());
-                                        }
-                                        if let Some(back1) = &artifact.images.back1 {
-                                            image_keys.push(back1.clone());
-                                        }
-
                                         // Load thumbnails for all images
-                                        self.load_thumbnails_batch(image_keys.clone(), ctx);
+                                        let all_keys: Vec<String> = artifact.images.all_keys().iter().map(|s| s.to_string()).collect();
+                                        self.load_thumbnails_batch(all_keys, ctx);
 
-                                        // Display images in a grid (2 columns)
+                                        // Display images in a grid
                                         let grid_size = 300.0;
                                         let spacing = 20.0;
 
                                         ui.horizontal_wrapped(|ui| {
                                             ui.spacing_mut().item_spacing = egui::vec2(spacing, spacing);
 
-                                            // Front 1
-                                            ui.vertical(|ui| {
-                                                ui.label(egui::RichText::new("Front 1").strong());
-                                                if let Some(texture) = self.thumbnails.get(&artifact.images.front1) {
-                                                    let texture_size = texture.size_vec2();
-
-                                                    // Fit within bounds while maintaining aspect ratio
-                                                    let scale = (grid_size / texture_size.x).min(grid_size / texture_size.y);
-                                                    let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
-
-                                                    if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
-                                                        self.navigate_to_image(&artifact.images.front1);
-                                                    }
-                                                } else {
-                                                    ui.label("Loading...");
-                                                }
-                                                ui.label(egui::RichText::new(&artifact.images.front1).weak().size(10.0));
-                                            });
-
-                                            // Front 2
-                                            if let Some(front2) = &artifact.images.front2 {
+                                            for (i, front) in artifact.images.fronts.iter().enumerate() {
                                                 ui.vertical(|ui| {
-                                                    ui.label(egui::RichText::new("Front 2").strong());
-                                                    if let Some(texture) = self.thumbnails.get(front2) {
+                                                    ui.label(egui::RichText::new(format!("Front {}", i + 1)).strong());
+                                                    if let Some(texture) = self.thumbnails.get(front) {
                                                         let texture_size = texture.size_vec2();
-
-                                                        // Fit within bounds while maintaining aspect ratio
                                                         let scale = (grid_size / texture_size.x).min(grid_size / texture_size.y);
                                                         let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
 
                                                         if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
-                                                            self.navigate_to_image(front2);
+                                                            self.navigate_to_image(front);
                                                         }
                                                     } else {
                                                         ui.label("Loading...");
                                                     }
-                                                    ui.label(egui::RichText::new(front2.as_str()).weak().size(10.0));
+                                                    ui.label(egui::RichText::new(front.as_str()).weak().size(10.0));
                                                 });
                                             }
 
-                                            // Back 1
-                                            if let Some(back1) = &artifact.images.back1 {
+                                            for (i, back) in artifact.images.backs.iter().enumerate() {
                                                 ui.vertical(|ui| {
-                                                    ui.label(egui::RichText::new("Back 1").strong());
-                                                    if let Some(texture) = self.thumbnails.get(back1) {
+                                                    ui.label(egui::RichText::new(format!("Back {}", i + 1)).strong());
+                                                    if let Some(texture) = self.thumbnails.get(back) {
                                                         let texture_size = texture.size_vec2();
-
-                                                        // Fit within bounds while maintaining aspect ratio
                                                         let scale = (grid_size / texture_size.x).min(grid_size / texture_size.y);
                                                         let display_size = Vec2::new(texture_size.x * scale, texture_size.y * scale);
 
                                                         if ui.add(egui::Image::new((texture.id(), display_size)).sense(egui::Sense::click())).clicked() {
-                                                            self.navigate_to_image(back1);
+                                                            self.navigate_to_image(back);
                                                         }
                                                     } else {
                                                         ui.label("Loading...");
                                                     }
-                                                    ui.label(egui::RichText::new(back1.as_str()).weak().size(10.0));
+                                                    ui.label(egui::RichText::new(back.as_str()).weak().size(10.0));
                                                 });
                                             }
                                         });
@@ -2081,6 +2121,171 @@ impl eframe::App for FamilyPhotosApp {
                                         ui.add_space(5.0);
                                     }
                                 }
+
+                                // Merge section
+                                ui.add_space(20.0);
+                                ui.separator();
+                                ui.add_space(10.0);
+
+                                let is_merge_mode = self.merge_mode_leader == Some(artifact_id);
+
+                                if !is_merge_mode && !self.merge_in_progress {
+                                    if ui.button("Merge with...").clicked() {
+                                        self.merge_mode_leader = Some(artifact_id);
+                                        self.merge_follower_search.clear();
+                                        self.merge_selected_follower = None;
+                                        self.merge_confirm_input.clear();
+                                    }
+                                }
+
+                                if is_merge_mode {
+                                    ui.heading(egui::RichText::new("Merge Artifacts").size(20.0));
+                                    ui.add_space(5.0);
+                                    ui.label(format!("Merge another artifact into Artifact #{}. This artifact will be the leader (keeps its ID).", artifact_id));
+                                    ui.add_space(10.0);
+
+                                    if self.merge_selected_follower.is_none() {
+                                        // Step 1: Search for follower
+                                        ui.horizontal(|ui| {
+                                            ui.label("Find artifact to merge:");
+                                            ui.add(egui::TextEdit::singleline(&mut self.merge_follower_search)
+                                                .hint_text("Search by ID, image key, tag, person...")
+                                                .desired_width(300.0));
+                                        });
+
+                                        if !self.merge_follower_search.is_empty() {
+                                            let query = self.merge_follower_search.to_lowercase();
+                                            // Clone matched artifacts to avoid holding immutable borrow on self
+                                            let matches: Vec<Artifact> = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
+                                                artifacts.iter()
+                                                    .filter(|a| a.id != artifact_id && artifact_matches_query(a, &query))
+                                                    .take(10)
+                                                    .cloned()
+                                                    .collect()
+                                            } else {
+                                                Vec::new()
+                                            };
+
+                                            // Load thumbnails for matches
+                                            let match_keys: Vec<String> = matches.iter()
+                                                .map(|a| a.images.front1().to_string())
+                                                .collect();
+                                            self.load_thumbnails_batch(match_keys, ctx);
+
+                                            if matches.is_empty() {
+                                                ui.label("No matching artifacts found");
+                                            } else {
+                                                let mut selected_id = None;
+                                                egui::Frame::group(ui.style())
+                                                    .show(ui, |ui| {
+                                                        for candidate in &matches {
+                                                            let clicked = ui.horizontal(|ui| {
+                                                                // Thumbnail
+                                                                if let Some(texture) = self.thumbnails.get(candidate.images.front1()) {
+                                                                    let size = texture.size_vec2();
+                                                                    let scale = (40.0 / size.x).min(40.0 / size.y);
+                                                                    ui.image((texture.id(), Vec2::new(size.x * scale, size.y * scale)));
+                                                                }
+                                                                let label = format!("#{} - {}", candidate.id, candidate.images.front1());
+                                                                ui.selectable_label(false, label)
+                                                            }).inner.clicked();
+
+                                                            if clicked {
+                                                                selected_id = Some(candidate.id);
+                                                            }
+                                                        }
+                                                    });
+                                                if let Some(id) = selected_id {
+                                                    self.merge_selected_follower = Some(id);
+                                                }
+                                            }
+                                        }
+                                    } else if let Some(follower_id) = self.merge_selected_follower {
+                                        // Step 2: Preview and confirm
+                                        let follower = if let LoadState::Loaded(artifacts) = self.artifacts.get() {
+                                            artifacts.iter().find(|a| a.id == follower_id).cloned()
+                                        } else {
+                                            None
+                                        };
+
+                                        if let Some(follower) = follower {
+                                            ui.label(egui::RichText::new(format!("Merging Artifact #{} into Artifact #{}", follower_id, artifact_id)).strong());
+                                            ui.add_space(10.0);
+
+                                            // Preview merged images
+                                            egui::Frame::group(ui.style())
+                                                .show(ui, |ui| {
+                                                    ui.label(egui::RichText::new("Merged result:").strong());
+                                                    ui.add_space(5.0);
+
+                                                    // Fronts
+                                                    let total_fronts = artifact.images.fronts.len() + follower.images.fronts.len();
+                                                    for (i, front) in artifact.images.fronts.iter().enumerate() {
+                                                        ui.label(format!("  Front {} (from #{}): {}", i + 1, artifact_id, front));
+                                                    }
+                                                    for (i, front) in follower.images.fronts.iter().enumerate() {
+                                                        ui.label(format!("  Front {} (from #{}): {}", artifact.images.fronts.len() + i + 1, follower_id, front));
+                                                    }
+
+                                                    // Backs
+                                                    let total_backs = artifact.images.backs.len() + follower.images.backs.len();
+                                                    if total_backs > 0 {
+                                                        for (i, back) in artifact.images.backs.iter().enumerate() {
+                                                            ui.label(format!("  Back {} (from #{}): {}", i + 1, artifact_id, back));
+                                                        }
+                                                        for (i, back) in follower.images.backs.iter().enumerate() {
+                                                            ui.label(format!("  Back {} (from #{}): {}", artifact.images.backs.len() + i + 1, follower_id, back));
+                                                        }
+                                                    }
+
+                                                    ui.add_space(5.0);
+                                                    ui.label(format!("Total: {} fronts, {} backs", total_fronts, total_backs));
+                                                });
+
+                                            ui.add_space(10.0);
+                                            ui.colored_label(egui::Color32::YELLOW, format!(
+                                                "Artifact #{} will be deleted after merge. This cannot be undone.",
+                                                follower_id
+                                            ));
+                                            ui.add_space(5.0);
+
+                                            ui.horizontal(|ui| {
+                                                ui.label(format!("Type \"{}\" to confirm:", follower_id));
+                                                ui.add(egui::TextEdit::singleline(&mut self.merge_confirm_input)
+                                                    .desired_width(80.0));
+                                            });
+
+                                            ui.add_space(5.0);
+                                            let confirmed = self.merge_confirm_input.trim() == follower_id.to_string();
+                                            ui.horizontal(|ui| {
+                                                if ui.add_enabled(confirmed && !self.merge_in_progress, egui::Button::new("Confirm Merge")).clicked() {
+                                                    self.start_merge(artifact_id, follower_id);
+                                                }
+                                                if ui.button("Change selection").clicked() {
+                                                    self.merge_selected_follower = None;
+                                                    self.merge_confirm_input.clear();
+                                                }
+                                            });
+
+                                            if self.merge_in_progress {
+                                                ui.spinner();
+                                            }
+                                        } else {
+                                            ui.label("Follower artifact not found");
+                                            self.merge_selected_follower = None;
+                                        }
+                                    }
+
+                                    ui.add_space(5.0);
+                                    if !self.merge_in_progress {
+                                        if ui.button("Cancel merge").clicked() {
+                                            self.merge_mode_leader = None;
+                                            self.merge_follower_search.clear();
+                                            self.merge_selected_follower = None;
+                                            self.merge_confirm_input.clear();
+                                        }
+                                    }
+                                }
                             } else {
                                 ui.vertical_centered(|ui| {
                                     ui.add_space(40.0);
@@ -2152,7 +2357,7 @@ impl eframe::App for FamilyPhotosApp {
                                         if load_end > load_start {
                                             let keys_to_load: Vec<String> = filtered_artifacts[load_start..load_end]
                                                 .iter()
-                                                .map(|a| a.images.front1.clone())
+                                                .map(|a| a.images.front1().to_string())
                                                 .collect();
                                             for chunk in keys_to_load.chunks(THUMBNAIL_BATCH_SIZE) {
                                                 self.load_thumbnails_batch(chunk.to_vec(), ctx);
@@ -2184,7 +2389,7 @@ impl eframe::App for FamilyPhotosApp {
                                                 body.rows(thumbnail_height, filtered_artifacts.len(), |mut row| {
                                                     let idx = row.index();
                                                     let artifact = filtered_artifacts[idx];
-                                                    let front_key = &artifact.images.front1;
+                                                    let front_key = artifact.images.front1();
                                                     let artifact_id = artifact.id;
                                                     let is_selected = selected_artifact == Some(artifact_id);
                                                     row.set_selected(is_selected);
@@ -2426,6 +2631,33 @@ async fn update_image_rotation(request: RotateImageRequest) -> Result<RotateImag
 
 async fn send_artifact_update(request: UpdateArtifactRequest) -> Result<UpdateArtifactResponse, String> {
     let full_url = format!("{}/api/artifacts/update", API_BASE_URL);
+
+    let body_json = serde_json::to_string(&request)
+        .map_err(|e| format!("Failed to serialize request: {}", e))?;
+
+    let mut http_request = ehttp::Request::post(full_url, body_json.into_bytes());
+    http_request.headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+    let response = ehttp::fetch_async(http_request)
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.ok {
+        if let Ok(error_response) = serde_json::from_slice::<ErrorResponse>(&response.bytes) {
+            return Err(error_response.error);
+        }
+        return Err(format!(
+            "HTTP error: {} {}",
+            response.status, response.status_text
+        ));
+    }
+
+    serde_json::from_slice(&response.bytes)
+        .map_err(|e| format!("JSON parse error: {}", e))
+}
+
+async fn send_merge_request(request: MergeArtifactsRequest) -> Result<MergeArtifactsResponse, String> {
+    let full_url = format!("{}/api/artifacts/merge", API_BASE_URL);
 
     let body_json = serde_json::to_string(&request)
         .map_err(|e| format!("Failed to serialize request: {}", e))?;

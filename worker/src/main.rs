@@ -6,9 +6,10 @@ use axum::{
     Router,
 };
 use common::{
-    ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, HistoryData,
-    ImageListResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest,
-    ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse,
+    ArtifactImages, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse,
+    HistoryData, ImageListResponse, MergeArtifactsRequest, MergeArtifactsResponse,
+    RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse,
+    UpdateArtifactRequest, UpdateArtifactResponse,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -72,6 +73,7 @@ async fn main() {
         .route("/api/images/full", get(full_image))
         .route("/api/images/rotate", post(rotate))
         .route("/api/artifacts/update", post(update_artifact))
+        .route("/api/artifacts/merge", post(merge_artifacts))
         .with_state(state)
         .fallback_service(serve_frontend)
         .layer(CorsLayer::permissive());
@@ -372,6 +374,140 @@ async fn update_artifact(
         Json(serde_json::to_value(UpdateArtifactResponse {
             success: true,
             update,
+        }).unwrap()),
+    ).into_response()
+}
+
+async fn merge_artifacts(
+    State(state): State<AppState>,
+    Json(request): Json<MergeArtifactsRequest>,
+) -> impl IntoResponse {
+    if request.leader_id == request.follower_id {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::to_value(ErrorResponse {
+                error: "Cannot merge an artifact with itself".to_string(),
+                error_type: "validation_error".to_string(),
+            }).unwrap()),
+        ).into_response();
+    }
+
+    let _lock = state.write_lock.lock().await;
+
+    let mut history = match read_history(&state.data_path) {
+        Ok(h) => h,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: e,
+                    error_type: "read_error".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    };
+
+    let leader_idx = match history.artifacts.iter().position(|a| a.id == request.leader_id) {
+        Some(i) => i,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: format!("Leader artifact not found: {}", request.leader_id),
+                    error_type: "not_found".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    };
+
+    let follower_idx = match history.artifacts.iter().position(|a| a.id == request.follower_id) {
+        Some(i) => i,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: format!("Follower artifact not found: {}", request.follower_id),
+                    error_type: "not_found".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    };
+
+    // Clone follower data before mutating
+    let follower = history.artifacts[follower_idx].clone();
+    let leader = &history.artifacts[leader_idx];
+
+    // Merge images: leader fronts + follower fronts, leader backs + follower backs
+    let merged_images = ArtifactImages {
+        fronts: leader.images.fronts.iter()
+            .chain(follower.images.fronts.iter())
+            .cloned()
+            .collect(),
+        backs: leader.images.backs.iter()
+            .chain(follower.images.backs.iter())
+            .cloned()
+            .collect(),
+    };
+
+    // Merge updates: combine both, sort by timestamp, then add merge note
+    let mut merged_updates: Vec<ArtifactUpdate> = leader.updates.iter()
+        .chain(follower.updates.iter())
+        .cloned()
+        .collect();
+    merged_updates.sort_by(|a, b| a.updated.cmp(&b.updated));
+
+    merged_updates.push(ArtifactUpdate {
+        author: "system".to_string(),
+        updated: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        reason: format!("Merged artifact #{} into this artifact", request.follower_id),
+        date: None,
+        tags: None,
+        people: None,
+        location: None,
+    });
+
+    // Update leader in-place
+    history.artifacts[leader_idx].images = merged_images;
+    history.artifacts[leader_idx].updates = merged_updates;
+
+    // Remove follower
+    history.artifacts.retain(|a| a.id != request.follower_id);
+
+    let merged_artifact = history.artifacts.iter()
+        .find(|a| a.id == request.leader_id)
+        .unwrap()
+        .clone();
+
+    // Write history
+    let history_file = state.data_path.join("history.toml");
+    match common::format_history_toml(&history) {
+        Ok(toml_str) => {
+            if let Err(e) = tokio::fs::write(&history_file, &toml_str).await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::to_value(ErrorResponse {
+                        error: format!("Failed to write history.toml: {}", e),
+                        error_type: "io_error".to_string(),
+                    }).unwrap()),
+                ).into_response();
+            }
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(ErrorResponse {
+                    error: format!("Failed to format history.toml: {}", e),
+                    error_type: "format_error".to_string(),
+                }).unwrap()),
+            ).into_response();
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::to_value(MergeArtifactsResponse {
+            success: true,
+            merged_artifact,
         }).unwrap()),
     ).into_response()
 }

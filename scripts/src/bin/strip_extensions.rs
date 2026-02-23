@@ -15,12 +15,11 @@ fn main() {
     }
 
     for artifact in &mut data.artifacts {
-        artifact.images.front1 = strip_ext(&artifact.images.front1);
-        if let Some(ref f2) = artifact.images.front2 {
-            artifact.images.front2 = Some(strip_ext(f2));
+        for front in &mut artifact.images.fronts {
+            *front = strip_ext(front);
         }
-        if let Some(ref b1) = artifact.images.back1 {
-            artifact.images.back1 = Some(strip_ext(b1));
+        for back in &mut artifact.images.backs {
+            *back = strip_ext(back);
         }
     }
 

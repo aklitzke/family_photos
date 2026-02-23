@@ -3975,6 +3975,16 @@ id = 774
 images.front1 = "Family History/Pile 6 Again/FastFoto_1706"
 images.back1 = "Family History/Pile 6 Again/FastFoto_1706_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:03:30Z"
+reason = "Thats me! Better gimme my cheesecake"
+date = "1994-06"
+people = ["Andrew Klitzke"]
+location = """
+Jossi Family House
+Neenah, WI"""
+
 [[artifacts]]
 id = 775
 images.front1 = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0896"
@@ -6406,7 +6416,20 @@ images.back1 = "Family History/Pile 23 Trash Pile On Fridge/FastFoto_1020_b"
 [[artifacts]]
 id = 1257
 images.front1 = "Family History/Pile 6 Again/FastFoto_1702"
+images.front2 = "Family History/Pile 6/2025-12-26-19-22-0001"
 images.back1 = "Family History/Pile 6 Again/FastFoto_1702_b"
+
+[[artifacts.updates]]
+author = "system"
+updated = "2026-02-23T01:00:20Z"
+reason = "Merged artifact #2393 into this artifact"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T01:00:56Z"
+reason = "description on back"
+date = "1991"
+people = ["Laura Klitzke"]
 
 [[artifacts]]
 id = 1258
@@ -6532,6 +6555,13 @@ images.back1 = "Family History/Pile 4 Again/FastFoto_0234_b"
 id = 1282
 images.front1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1129"
 images.back1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1129_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:33:04Z"
+reason = "born in '44, looks about 3"
+date = "1947"
+people = ["Robert Klitzke"]
 
 [[artifacts]]
 id = 1283
@@ -7487,6 +7517,14 @@ images.back1 = "Family History/Pile 27 Picture Book/FastFoto_1196_b"
 id = 1472
 images.front1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1136"
 images.back1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1136_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:46:40Z"
+reason = "date printed on report card"
+date = "1952"
+tags = ["report card"]
+people = ["Robert Klitzke"]
 
 [[artifacts]]
 id = 1473
@@ -8699,6 +8737,14 @@ images.back1 = "Family History/Pile 2 Again/FastFoto_1615_b"
 id = 1712
 images.front1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1120"
 images.back1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1120_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T00:42:15Z"
+reason = "date is a guess"
+date = "1951"
+tags = ["klitzke parade"]
+people = ["Robert Klitzke"]
 
 [[artifacts]]
 id = 1713
@@ -11559,10 +11605,6 @@ images.front1 = "Family History/Pile 5/2025-12-26-18-18-0030"
 [[artifacts]]
 id = 2392
 images.front1 = "Family History/Pile 5/2025-12-26-18-18-0031"
-
-[[artifacts]]
-id = 2393
-images.front1 = "Family History/Pile 6/2025-12-26-19-22-0001"
 
 [[artifacts]]
 id = 2394
@@ -18486,15 +18528,18 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-000
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-0003"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-0004"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-0005"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-0006"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-0007"
@@ -18561,6 +18606,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/2025-12-28-11-43-002
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1088"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1088_b"
@@ -18579,6 +18625,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1090_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1091"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1091_b"
@@ -18655,12 +18702,15 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1103"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1103_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1104"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1104_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1105"
@@ -18670,12 +18720,15 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1105_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1106"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1106_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1107"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1107_b"
@@ -18700,9 +18753,11 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1110_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1111"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1111_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1112"
@@ -18720,12 +18775,14 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1113_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1114"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1114_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1115"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1115_b"
@@ -18741,15 +18798,18 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1117"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1117_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1118"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1118_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1119"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1119_b"
@@ -18762,6 +18822,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1120_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1121"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1121_b"
@@ -18812,9 +18873,11 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1128_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1129"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1129_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1130"
@@ -18839,6 +18902,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1132_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1133"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1133_b"
@@ -18882,6 +18946,7 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1139_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1140"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1140_b"
@@ -18908,30 +18973,36 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1143_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1144"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1144_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1145"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1145_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1146"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1146_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1147"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1147_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1148"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1148_b"
@@ -18946,9 +19017,11 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1150"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1150_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1151"
@@ -18958,9 +19031,11 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1151_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1152"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1152_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1153"
@@ -18976,9 +19051,11 @@ key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1154_b"
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1155"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_1155_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 26 Bobs Envelope From Ext Family/IMG_20251228_0001"
@@ -24117,9 +24194,11 @@ key = "Family History/Pile 5/2025-12-26-18-18-0031"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1702"
+rotation = 270
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1702_b"
+rotation = 90
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1703"
@@ -24129,6 +24208,7 @@ key = "Family History/Pile 6 Again/FastFoto_1703_b"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1704"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1704_b"
@@ -24141,9 +24221,11 @@ key = "Family History/Pile 6 Again/FastFoto_1705_b"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1706"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1706_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1707"
@@ -24153,9 +24235,11 @@ key = "Family History/Pile 6 Again/FastFoto_1707_b"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1708"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1708_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1709"
@@ -24171,6 +24255,7 @@ key = "Family History/Pile 6 Again/FastFoto_1710_b"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1711"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1711_b"
@@ -24207,12 +24292,14 @@ key = "Family History/Pile 6 Again/FastFoto_1716_b"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1717"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1717_b"
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1718"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 6 Again/FastFoto_1718_b"
