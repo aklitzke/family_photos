@@ -707,6 +707,14 @@ id = 120
 images.front1 = "Family History/Pile 20 Vacations With Others Box/FastFoto_0791"
 images.back1 = "Family History/Pile 20 Vacations With Others Box/FastFoto_0791_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:24:50Z"
+reason = "The dome house! Can't recall precise year"
+tags = ["tomahawk vacation"]
+people = ["Ben Jossi"]
+location = "Tomahawk, WI"
+
 [[artifacts]]
 id = 121
 images.front1 = "Family History/Pile 4 Again/FastFoto_0222"
@@ -729,6 +737,19 @@ images.front1 = "Family History/Pile 5 Again/FastFoto_0303"
 id = 125
 images.front1 = "Family History/Pile 12/FastFoto_0397"
 images.back1 = "Family History/Pile 12/FastFoto_0397_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:20:56Z"
+reason = "not sure about year, but that's the view from the side of 2850's living room"
+tags = ["piano"]
+people = [
+    "Andrew Klitzke",
+    "Ben Jossi",
+]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 126
@@ -754,6 +775,13 @@ images.back1 = "Family History/Pile 27 Picture Book/FastFoto_1203_b"
 id = 130
 images.front1 = "Family History/Pile 18 Florida Box/FastFoto_0741"
 images.back1 = "Family History/Pile 18 Florida Box/FastFoto_0741_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:22:40Z"
+reason = "Damage from hurricane charlie?"
+date = "2006"
+location = "Florida"
 
 [[artifacts]]
 id = 131
@@ -9833,6 +9861,21 @@ images.front1 = "Family History/Pile 11/2025-12-27-11-34-0025"
 id = 1933
 images.front1 = "Family History/Pile 11/2025-12-27-11-34-0026"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:18:59Z"
+reason = "that's our backyard, on the bench built into the old deck. guessing about date"
+date = "1991"
+people = [
+    "Andrew Klitzke",
+    "Laura Klitzke",
+    "Melvin Jossi",
+    "Virginia Ebmeier",
+]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 1934
 images.front1 = "Family History/Pile 11/2025-12-27-11-34-0027"
@@ -12197,6 +12240,17 @@ images.front1 = "Family History/Pile 7/2025-12-26-21-47-0056"
 id = 2525
 images.front1 = "Family History/Pile 7/2025-12-26-21-47-0057"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:34:03Z"
+reason = "I believe this is from a ski trip we took with the Jossi's to Granite Peak / Rib Mountain sometime in the early 2000's? Guessing about date"
+date = "2003"
+tags = ["ski"]
+people = [
+    "Frank Jossi",
+    "Katherine Jossi",
+]
+
 [[artifacts]]
 id = 2526
 images.front1 = "Family History/Pile 7/2025-12-26-21-47-0058"
@@ -12276,6 +12330,19 @@ images.front1 = "Family History/Pile 7/2025-12-26-22-12-0016"
 [[artifacts]]
 id = 2545
 images.front1 = "Family History/Pile 7/2025-12-26-22-12-0017"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T03:39:24Z"
+reason = "I believe this is Laura as a kid? Perhaps Karen in the background?"
+date = "1988"
+people = [
+    "Karen Jossi",
+    "Laura Klitzke",
+]
+location = """
+Jossi Family House
+Neenah, WI"""
 
 [[artifacts]]
 id = 2546
@@ -15684,6 +15751,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 18 Florida Box/FastFoto_0741_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0742"
@@ -25263,6 +25331,7 @@ key = "Family History/Pile 7 Again/FastFoto_1852"
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1852_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1853"
