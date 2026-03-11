@@ -51,6 +51,15 @@ updated = "2026-02-18T03:21:35Z"
 reason = "water"
 tags = ["lakewood"]
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T21:23:15Z"
+reason = "that's us"
+people = [
+    "Andrew Klitzke",
+    "Robert Klitzke",
+]
+
 [[artifacts]]
 id = 6
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0812"
@@ -262,6 +271,17 @@ images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0811_b"
 id = 38
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0817"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0817_b"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-02-23T21:24:17Z"
+reason = """That's "the falling down house" at Lakewood!"""
+date = "1992"
+tags = ["lakewood"]
+people = [
+    "Laura Klitzke",
+    "Robert Klitzke",
+]
 
 [[artifacts]]
 id = 39
@@ -13144,6 +13164,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0309_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 12/FastFoto_0310"
@@ -16405,6 +16426,7 @@ rotation = 270
 
 [[images]]
 key = "Family History/Pile 19 Galena Seattle Box/FastFoto_0764_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 2 Again/FastFoto_1612"
@@ -16549,7 +16571,6 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 2 Again/FastFoto_1633"
-rotation = 180
 
 [[images]]
 key = "Family History/Pile 2 Again/FastFoto_1633_b"
@@ -18395,7 +18416,6 @@ key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0921_b"
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0922"
-rotation = 270
 
 [[images]]
 key = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0922_b"
@@ -21205,6 +21225,7 @@ key = "Family History/Pile 27 Picture Book/FastFoto_1313_b"
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1314"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1314_b"
@@ -25102,6 +25123,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0235"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 4 Again/FastFoto_0235_b"
@@ -27879,7 +27901,6 @@ key = "Family History/Pile 7/2025-12-26-22-12-0047"
 
 [[images]]
 key = "Family History/Pile 7/2025-12-26-22-12-0048"
-rotation = 180
 
 [[images]]
 key = "Family History/Pile 8 Again/2025-12-26-23-21-0034"
