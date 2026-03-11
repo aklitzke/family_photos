@@ -65,6 +65,12 @@ id = 6
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0812"
 images.back1 = "Family History/Pile 21 Lakewood Box/FastFoto_0812_b"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-03-11T21:58:55Z"
+reason = "lakewood beach, in pile with other lakewood photos"
+tags = ["lakewood"]
+
 [[artifacts]]
 id = 7
 images.front1 = "Family History/Pile 21 Lakewood Box/FastFoto_0834"
@@ -331,6 +337,13 @@ images.front1 = "Family History/Pile 1/2025-12-23-21-51-0004"
 [[artifacts]]
 id = 49
 images.front1 = "Family History/Pile 1/2025-12-23-21-54-0001"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-03-11T22:04:42Z"
+reason = "non-descript location, likely florida?"
+people = ["Robert Klitzke"]
+location = "Florida"
 
 [[artifacts]]
 id = 50
@@ -9797,9 +9810,36 @@ images.front1 = "Family History/Pile 11/2025-12-27-11-34-0004"
 id = 1912
 images.front1 = "Family History/Pile 11/2025-12-27-11-34-0005"
 
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-03-11T22:03:07Z"
+reason = """
+that's me. wonder where this was
+
+guessing at date"""
+date = "1993"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-03-11T22:03:25Z"
+reason = "updating name"
+people = ["Andrew Klitzke"]
+
 [[artifacts]]
 id = 1913
 images.front1 = "Family History/Pile 11/2025-12-27-11-34-0006"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-03-11T22:01:35Z"
+reason = """
+laura eating snow in our backyard
+
+guessing at date"""
+date = "1991"
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 1914
@@ -11783,6 +11823,13 @@ images.front1 = "Family History/Pile 6/2025-12-26-19-22-0013"
 [[artifacts]]
 id = 2406
 images.front1 = "Family History/Pile 6/2025-12-26-19-22-0014"
+
+[[artifacts.updates]]
+author = "andrew"
+updated = "2026-03-11T22:07:43Z"
+reason = "Laura at south shore. I recognize Annie but not sure about the rest of her friends"
+people = ["Laura Klitzke"]
+location = "South Shore Yacht Club"
 
 [[artifacts]]
 id = 2407
@@ -26220,7 +26267,6 @@ key = "Family History/Pile 6/2025-12-26-19-22-0017"
 
 [[images]]
 key = "Family History/Pile 7 Again/2025-12-26-22-12-0048"
-rotation = 180
 
 [[images]]
 key = "Family History/Pile 7 Again/FastFoto_1719"
