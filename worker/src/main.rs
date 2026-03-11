@@ -1,21 +1,27 @@
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Json},
     routing::{get, post},
     Router,
 };
 use common::{
     ArtifactImages, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse,
-    HistoryData, ImageListResponse, MergeArtifactsRequest, MergeArtifactsResponse,
-    RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse,
-    UpdateArtifactRequest, UpdateArtifactResponse,
+    HistoryData, ImageListResponse, LoginRequest, LoginResponse, MeResponse,
+    MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse,
+    ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse,
 };
+use rand::Rng;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
+
+const USERS: &[(&str, &str)] = &[
+    ("testuser", "testpassword"),
+    // Add more users here
+];
 
 #[derive(Clone)]
 struct AppState {
@@ -24,6 +30,70 @@ struct AppState {
     thumbs_path: PathBuf,
     /// Serialize writes to history.toml so concurrent rotations don't race.
     write_lock: std::sync::Arc<Mutex<()>>,
+    /// In-memory session store: token -> username
+    sessions: std::sync::Arc<Mutex<HashMap<String, String>>>,
+}
+
+/// Authenticated user extracted from session cookie.
+struct AuthenticatedUser {
+    username: String,
+}
+
+impl<S> axum::extract::FromRequestParts<S> for AuthenticatedUser
+where
+    S: Send + Sync,
+    AppState: axum::extract::FromRef<S>,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let app_state = <AppState as axum::extract::FromRef<S>>::from_ref(state);
+        let cookie_header = parts
+            .headers
+            .get(header::COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        let token = cookie_header
+            .split(';')
+            .filter_map(|s| {
+                let s = s.trim();
+                s.strip_prefix("session=")
+            })
+            .next();
+
+        let token = match token {
+            Some(t) if !t.is_empty() => t,
+            _ => return Err((StatusCode::UNAUTHORIZED, "Not authenticated")),
+        };
+
+        let sessions: tokio::sync::MutexGuard<'_, HashMap<String, String>> =
+            app_state.sessions.lock().await;
+        match sessions.get(token) {
+            Some(username) => Ok(AuthenticatedUser {
+                username: username.clone(),
+            }),
+            None => Err((StatusCode::UNAUTHORIZED, "Invalid session")),
+        }
+    }
+}
+
+fn generate_session_token() -> String {
+    let mut rng = rand::thread_rng();
+    let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+    hex::encode(bytes)
+}
+
+fn session_cookie(token: &str, clear: bool) -> String {
+    let max_age = if clear { 0 } else { 2592000 }; // 30 days
+    let secure = if cfg!(debug_assertions) { "" } else { "; Secure" };
+    format!(
+        "session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}{}",
+        token, max_age, secure
+    )
 }
 
 fn read_history(data_path: &Path) -> Result<HistoryData, String> {
@@ -57,6 +127,7 @@ async fn main() {
         images_path: PathBuf::from(&images_path),
         thumbs_path: PathBuf::from(&thumbs_path),
         write_lock: std::sync::Arc::new(Mutex::new(())),
+        sessions: std::sync::Arc::new(Mutex::new(HashMap::new())),
     };
 
     // Serve frontend static files with index.html fallback for SPA routing
@@ -64,8 +135,21 @@ async fn main() {
     let serve_frontend = ServeDir::new(&frontend_path)
         .not_found_service(ServeFile::new(&index_file));
 
+    let cors = if cfg!(debug_assertions) {
+        CorsLayer::new()
+            .allow_origin("http://localhost:8080".parse::<axum::http::HeaderValue>().unwrap())
+            .allow_methods(tower_http::cors::Any)
+            .allow_headers(tower_http::cors::Any)
+            .allow_credentials(true)
+    } else {
+        CorsLayer::permissive()
+    };
+
     let app = Router::new()
         .route("/api/health", get(health))
+        .route("/api/login", post(login))
+        .route("/api/logout", post(logout))
+        .route("/api/me", get(me))
         .route("/api/images/list", get(images_list))
         .route("/api/artifacts/list", get(artifacts_list))
         .route("/api/images/thumbnail", get(thumbnail))
@@ -76,7 +160,7 @@ async fn main() {
         .route("/api/artifacts/merge", post(merge_artifacts))
         .with_state(state)
         .fallback_service(serve_frontend)
-        .layer(CorsLayer::permissive());
+        .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
         .await
@@ -92,14 +176,96 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
-async fn images_list(State(state): State<AppState>) -> impl IntoResponse {
+async fn login(
+    State(state): State<AppState>,
+    Json(request): Json<LoginRequest>,
+) -> impl IntoResponse {
+    let valid = USERS
+        .iter()
+        .any(|(u, p)| *u == request.username && *p == request.password);
+
+    if !valid {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(LoginResponse {
+                success: false,
+                username: String::new(),
+            }),
+        )
+            .into_response();
+    }
+
+    let token = generate_session_token();
+    {
+        let mut sessions = state.sessions.lock().await;
+        sessions.insert(token.clone(), request.username.clone());
+    }
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::SET_COOKIE,
+        session_cookie(&token, false).parse().unwrap(),
+    );
+
+    (
+        StatusCode::OK,
+        headers,
+        Json(LoginResponse {
+            success: true,
+            username: request.username,
+        }),
+    )
+        .into_response()
+}
+
+async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    // Extract session token from cookie
+    let cookie_header = headers
+        .get(header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if let Some(token) = cookie_header
+        .split(';')
+        .filter_map(|s| s.trim().strip_prefix("session="))
+        .next()
+    {
+        let mut sessions = state.sessions.lock().await;
+        sessions.remove(token);
+    }
+
+    let mut resp_headers = HeaderMap::new();
+    resp_headers.insert(
+        header::SET_COOKIE,
+        session_cookie("", true).parse().unwrap(),
+    );
+
+    (StatusCode::OK, resp_headers, Json(serde_json::json!({"success": true}))).into_response()
+}
+
+async fn me(user: AuthenticatedUser) -> Json<MeResponse> {
+    Json(MeResponse {
+        username: user.username,
+    })
+}
+
+async fn images_list(
+    _user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
     match read_history(&state.data_path) {
         Ok(history) => Json(ImageListResponse { images: history.images }).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     }
 }
 
-async fn artifacts_list(State(state): State<AppState>) -> impl IntoResponse {
+async fn artifacts_list(
+    _user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
     match read_history(&state.data_path) {
         Ok(history) => Json(ArtifactListResponse { artifacts: history.artifacts }).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
@@ -137,6 +303,7 @@ fn thumb_file(thumbs_path: &Path, key: &str) -> PathBuf {
 }
 
 async fn thumbnail(
+    _user: AuthenticatedUser,
     State(state): State<AppState>,
     Query(params): Query<KeyParam>,
 ) -> impl IntoResponse {
@@ -156,6 +323,7 @@ async fn thumbnail(
 }
 
 async fn thumbnails_batch(
+    _user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(request): Json<ThumbnailBatchRequest>,
 ) -> Json<ThumbnailBatchResponse> {
@@ -170,6 +338,7 @@ async fn thumbnails_batch(
 }
 
 async fn full_image(
+    _user: AuthenticatedUser,
     State(state): State<AppState>,
     Query(params): Query<KeyParam>,
 ) -> impl IntoResponse {
@@ -187,6 +356,7 @@ async fn full_image(
 }
 
 async fn rotate(
+    _user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(request): Json<RotateImageRequest>,
 ) -> impl IntoResponse {
@@ -278,6 +448,7 @@ fn is_valid_date_format(s: &str) -> bool {
 }
 
 async fn update_artifact(
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(request): Json<UpdateArtifactRequest>,
 ) -> impl IntoResponse {
@@ -334,7 +505,7 @@ async fn update_artifact(
     };
 
     let update = ArtifactUpdate {
-        author: "andrew".to_string(),
+        author: user.username.clone(),
         updated: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         reason: request.reason,
         date: request.date,
@@ -379,6 +550,7 @@ async fn update_artifact(
 }
 
 async fn merge_artifacts(
+    _user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(request): Json<MergeArtifactsRequest>,
 ) -> impl IntoResponse {

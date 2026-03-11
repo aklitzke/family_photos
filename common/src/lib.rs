@@ -199,6 +199,23 @@ pub struct ErrorResponse {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LoginResponse {
+    pub success: bool,
+    pub username: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MeResponse {
+    pub username: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct MergeArtifactsRequest {
     pub leader_id: u32,
     pub follower_id: u32,

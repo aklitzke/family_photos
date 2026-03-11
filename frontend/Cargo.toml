@@ -24,6 +24,6 @@ js-sys = "0.3"
 web-sys = { version = "0.3.83", features = [
     "Blob", "CanvasRenderingContext2d", "Document",
     "HtmlCanvasElement", "History", "ImageBitmap", "ImageData",
-    "Location", "Request", "RequestInit", "RequestMode",
+    "Location", "Request", "RequestCredentials", "RequestInit", "RequestMode",
     "Response", "Url", "Window",
 ] }

@@ -1,4 +1,4 @@
-use common::{artifact_date, artifact_location, artifact_people, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
+use common::{artifact_date, artifact_location, artifact_people, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, LoginRequest, LoginResponse, MeResponse, MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -30,6 +30,13 @@ enum Page {
     Images,
     Artifacts,
     Health,
+}
+
+#[derive(Clone)]
+enum AuthState {
+    Checking,
+    LoggedIn(String),
+    LoggedOut,
 }
 
 #[derive(Clone)]
@@ -193,6 +200,13 @@ pub fn start() -> Result<(), JsValue> {
 }
 
 struct FamilyPhotosApp {
+    auth_state: AuthState,
+    auth_checking: Option<Arc<Mutex<LoadState<MeResponse>>>>,
+    login_username: String,
+    login_password: String,
+    login_error: Option<String>,
+    login_in_progress: bool,
+    login_promise: Option<Arc<Mutex<LoadState<LoginResponse>>>>,
     images: AsyncResource<Vec<ImageMetadata>>,
     artifacts: AsyncResource<Vec<Artifact>>,
     thumbnails: HashMap<String, TextureHandle>,
@@ -234,7 +248,7 @@ struct FamilyPhotosApp {
 }
 
 impl FamilyPhotosApp {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // Redirect root URL to /artifacts
         if let Some(window) = web_sys::window() {
             if let Ok(location) = window.location().pathname() {
@@ -245,7 +259,30 @@ impl FamilyPhotosApp {
             }
         }
 
+        // Fire initial session check
+        let auth_state_holder = Arc::new(Mutex::new(LoadState::<MeResponse>::Loading));
+        let auth_state_clone = auth_state_holder.clone();
+        let ctx = cc.egui_ctx.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            match fetch_json_with_credentials::<MeResponse>("/api/me").await {
+                Ok(me) => {
+                    *auth_state_clone.lock().unwrap() = LoadState::Loaded(me);
+                }
+                Err(_) => {
+                    *auth_state_clone.lock().unwrap() = LoadState::Failed("not authenticated".to_string());
+                }
+            }
+            ctx.request_repaint();
+        });
+
         Self {
+            auth_state: AuthState::Checking,
+            auth_checking: Some(auth_state_holder),
+            login_username: String::new(),
+            login_password: String::new(),
+            login_error: None,
+            login_in_progress: false,
+            login_promise: None,
             images: AsyncResource::new(),
             artifacts: AsyncResource::new(),
             thumbnails: HashMap::new(),
@@ -649,6 +686,89 @@ impl FamilyPhotosApp {
         }
     }
 
+    fn render_login_page(&mut self, ctx: &egui::Context) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let panel_width = 300.0;
+            let available = ui.available_size();
+            let left_pad = ((available.x - panel_width) / 2.0).max(0.0);
+
+            ui.add_space(available.y * 0.25);
+            ui.horizontal(|ui| {
+                ui.add_space(left_pad);
+                ui.vertical(|ui| {
+                    ui.heading(egui::RichText::new("Family Photos").size(32.0).strong());
+                    ui.add_space(10.0);
+                    ui.label("Welcome. Please log in to continue.");
+                    ui.add_space(20.0);
+
+                    ui.label("Username");
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.login_username)
+                            .desired_width(panel_width)
+                    );
+                    ui.add_space(8.0);
+
+                    ui.label("Password");
+                    let pw_response = ui.add(
+                        egui::TextEdit::singleline(&mut self.login_password)
+                            .password(true)
+                            .desired_width(panel_width)
+                    );
+                    ui.add_space(12.0);
+
+                    let enter_pressed = pw_response.lost_focus()
+                        && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+                    let login_enabled = !self.login_in_progress
+                        && !self.login_username.is_empty()
+                        && !self.login_password.is_empty();
+
+                    let button_clicked = ui
+                        .add_enabled(login_enabled, egui::Button::new("Log in"))
+                        .clicked();
+
+                    if (button_clicked || (enter_pressed && login_enabled)) && !self.login_in_progress {
+                        self.login_in_progress = true;
+                        self.login_error = None;
+
+                        let loading_state = Arc::new(Mutex::new(LoadState::<LoginResponse>::Loading));
+                        self.login_promise = Some(loading_state.clone());
+
+                        let request = LoginRequest {
+                            username: self.login_username.clone(),
+                            password: self.login_password.clone(),
+                        };
+                        let ctx_clone = ctx.clone();
+                        wasm_bindgen_futures::spawn_local(async move {
+                            let result = post_json_with_credentials::<LoginRequest, LoginResponse>(
+                                "/api/login",
+                                &request,
+                            ).await;
+                            match result {
+                                Ok(resp) => {
+                                    *loading_state.lock().unwrap() = LoadState::Loaded(resp);
+                                }
+                                Err(e) => {
+                                    *loading_state.lock().unwrap() = LoadState::Failed(e);
+                                }
+                            }
+                            ctx_clone.request_repaint();
+                        });
+                    }
+
+                    if self.login_in_progress {
+                        ui.spinner();
+                    }
+
+                    if let Some(err) = &self.login_error {
+                        ui.add_space(8.0);
+                        ui.colored_label(egui::Color32::RED, err);
+                    }
+                });
+            });
+        });
+    }
+
     fn render_sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("sidebar")
             .resizable(false)
@@ -656,7 +776,28 @@ impl FamilyPhotosApp {
             .show(ctx, |ui| {
                 ui.add_space(20.0);
                 ui.heading("Family Photos");
-                ui.add_space(20.0);
+                ui.add_space(10.0);
+
+                if let AuthState::LoggedIn(ref username) = self.auth_state {
+                    ui.label(format!("Logged in as {}", username));
+                    if ui.small_button("Logout").clicked() {
+                        let ctx_clone = ctx.clone();
+                        wasm_bindgen_futures::spawn_local(async move {
+                            let _ = post_empty_with_credentials("/api/logout").await;
+                            ctx_clone.request_repaint();
+                        });
+                        self.auth_state = AuthState::LoggedOut;
+                        // Clear loaded data
+                        self.images = AsyncResource::new();
+                        self.artifacts = AsyncResource::new();
+                        self.health = AsyncResource::new();
+                        self.thumbnails.clear();
+                        self.full_images.clear();
+                        self.full_images_bytes.clear();
+                    }
+                }
+
+                ui.add_space(10.0);
 
                 if ui.selectable_label(self.get_current_page() == Page::Artifacts, "Artifacts").clicked() {
                     self.navigate_to_page(Page::Artifacts);
@@ -765,10 +906,14 @@ impl FamilyPhotosApp {
         self.update_in_progress.insert(artifact_id, true);
 
         // Optimistically update local artifact data
+        let author = match &self.auth_state {
+            AuthState::LoggedIn(u) => u.clone(),
+            _ => "unknown".to_string(),
+        };
         if let LoadState::Loaded(artifacts) = &mut self.artifacts.state {
             if let Some(a) = artifacts.iter_mut().find(|a| a.id == artifact_id) {
                 a.updates.push(ArtifactUpdate {
-                    author: "andrew".to_string(),
+                    author,
                     updated: String::new(),
                     reason: reason.clone(),
                     date: date.clone(),
@@ -1094,6 +1239,64 @@ fn format_date_for_display(iso: &str) -> String {
 
 impl eframe::App for FamilyPhotosApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Process auth state check
+        if let Some(auth_holder) = &self.auth_checking {
+            let result = auth_holder.lock().unwrap().clone();
+            match result {
+                LoadState::Loaded(me) => {
+                    self.auth_state = AuthState::LoggedIn(me.username);
+                    self.auth_checking = None;
+                }
+                LoadState::Failed(_) => {
+                    self.auth_state = AuthState::LoggedOut;
+                    self.auth_checking = None;
+                }
+                _ => {}
+            }
+        }
+
+        // Process login promise
+        if let Some(login_holder) = &self.login_promise {
+            let result = login_holder.lock().unwrap().clone();
+            match result {
+                LoadState::Loaded(resp) => {
+                    self.login_in_progress = false;
+                    self.login_promise = None;
+                    if resp.success {
+                        self.auth_state = AuthState::LoggedIn(resp.username);
+                        self.login_error = None;
+                        self.login_username.clear();
+                        self.login_password.clear();
+                    } else {
+                        self.login_error = Some("Invalid username or password".to_string());
+                    }
+                }
+                LoadState::Failed(err) => {
+                    self.login_in_progress = false;
+                    self.login_promise = None;
+                    self.login_error = Some(format!("Login failed: {}", err));
+                }
+                _ => {}
+            }
+        }
+
+        // Gate on auth state
+        match &self.auth_state {
+            AuthState::Checking => {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.centered_and_justified(|ui| {
+                        ui.spinner();
+                    });
+                });
+                return;
+            }
+            AuthState::LoggedOut => {
+                self.render_login_page(ctx);
+                return;
+            }
+            AuthState::LoggedIn(_) => {}
+        }
+
         self.images.process();
         self.artifacts.process();
         self.process_loaded_thumbnails(ctx);
@@ -2580,148 +2783,117 @@ impl eframe::App for FamilyPhotosApp {
     }
 }
 
-async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
-    let full_url = format!("{}{}", API_BASE_URL, url);
-    let response = ehttp::fetch_async(ehttp::Request::get(&full_url))
-        .await
-        .map_err(|e| format!("Fetch failed: {}", e))?;
+/// Core fetch helper using web_sys with credentials: "include" for cookie support.
+async fn fetch_with_credentials(url: &str, method: &str, body: Option<&str>) -> Result<(u16, Vec<u8>), String> {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
 
-    if !response.ok {
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
+    let opts = web_sys::RequestInit::new();
+    opts.set_method(method);
+    opts.set_credentials(web_sys::RequestCredentials::Include);
+
+    if let Some(body_str) = body {
+        opts.set_body(&wasm_bindgen::JsValue::from_str(body_str));
     }
 
-    serde_json::from_slice(&response.bytes).map_err(|e| format!("JSON parse error: {}", e))
+    let request = web_sys::Request::new_with_str_and_init(url, &opts)
+        .map_err(|e| format!("Failed to create request: {:?}", e))?;
+
+    if body.is_some() {
+        request.headers().set("Content-Type", "application/json")
+            .map_err(|e| format!("Failed to set header: {:?}", e))?;
+    }
+
+    let window = web_sys::window().ok_or("No window")?;
+    let resp_value = JsFuture::from(window.fetch_with_request(&request))
+        .await
+        .map_err(|e| format!("Fetch failed: {:?}", e))?;
+
+    let resp: web_sys::Response = resp_value.dyn_into()
+        .map_err(|_| "Response is not a Response object".to_string())?;
+
+    let status = resp.status();
+
+    let array_buf = JsFuture::from(
+        resp.array_buffer().map_err(|e| format!("Failed to get body: {:?}", e))?
+    ).await.map_err(|e| format!("Failed to read body: {:?}", e))?;
+
+    let uint8_array = js_sys::Uint8Array::new(&array_buf);
+    let bytes = uint8_array.to_vec();
+
+    Ok((status, bytes))
+}
+
+async fn fetch_json_with_credentials<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
+    let full_url = format!("{}{}", API_BASE_URL, url);
+    let (status, bytes) = fetch_with_credentials(&full_url, "GET", None).await?;
+
+    if status < 200 || status >= 300 {
+        return Err(format!("HTTP error: {}", status));
+    }
+
+    serde_json::from_slice(&bytes).map_err(|e| format!("JSON parse error: {}", e))
+}
+
+async fn post_json_with_credentials<Req: serde::Serialize, Resp: serde::de::DeserializeOwned>(
+    url: &str,
+    request: &Req,
+) -> Result<Resp, String> {
+    let full_url = format!("{}{}", API_BASE_URL, url);
+    let body = serde_json::to_string(request)
+        .map_err(|e| format!("Failed to serialize: {}", e))?;
+    let (status, bytes) = fetch_with_credentials(&full_url, "POST", Some(&body)).await?;
+
+    if status < 200 || status >= 300 {
+        if let Ok(err_resp) = serde_json::from_slice::<ErrorResponse>(&bytes) {
+            return Err(err_resp.error);
+        }
+        return Err(format!("HTTP error: {}", status));
+    }
+
+    serde_json::from_slice(&bytes).map_err(|e| format!("JSON parse error: {}", e))
+}
+
+async fn post_empty_with_credentials(url: &str) -> Result<(), String> {
+    let full_url = format!("{}{}", API_BASE_URL, url);
+    let _ = fetch_with_credentials(&full_url, "POST", None).await?;
+    Ok(())
+}
+
+async fn fetch_bytes_with_credentials(url: &str) -> Result<Vec<u8>, String> {
+    let (status, bytes) = fetch_with_credentials(url, "GET", None).await?;
+    if status < 200 || status >= 300 {
+        return Err(format!("HTTP error: {}", status));
+    }
+    Ok(bytes)
+}
+
+async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
+    fetch_json_with_credentials(url).await
 }
 
 async fn fetch_image_from_url(url: &str) -> Result<Vec<u8>, String> {
-    let response = ehttp::fetch_async(ehttp::Request::get(url))
-        .await
-        .map_err(|e| format!("Fetch failed: {}", e))?;
-
-    if !response.ok {
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
-    }
-
-    Ok(response.bytes)
+    fetch_bytes_with_credentials(url).await
 }
 
 async fn fetch_thumbnails_batch(keys: &[String]) -> Result<HashMap<String, Vec<u8>>, String> {
-    let full_url = format!("{}/api/images/thumbnails", API_BASE_URL);
-    let request_body = ThumbnailBatchRequest {
-        keys: keys.to_vec(),
-    };
-
-    let body_json = serde_json::to_string(&request_body)
-        .map_err(|e| format!("Failed to serialize request: {}", e))?;
-
-    let mut request = ehttp::Request::post(full_url, body_json.into_bytes());
-    request.headers.insert("Content-Type".to_string(), "application/json".to_string());
-
-    let response = ehttp::fetch_async(request)
-        .await
-        .map_err(|e| format!("Fetch failed: {}", e))?;
-
-    if !response.ok {
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
-    }
-
-    let batch_response: ThumbnailBatchResponse = serde_json::from_slice(&response.bytes)
-        .map_err(|e| format!("JSON parse error: {}", e))?;
-
-    Ok(batch_response.thumbnails)
+    let request_body = ThumbnailBatchRequest { keys: keys.to_vec() };
+    post_json_with_credentials::<ThumbnailBatchRequest, ThumbnailBatchResponse>(
+        "/api/images/thumbnails",
+        &request_body,
+    ).await.map(|r| r.thumbnails)
 }
 
 async fn update_image_rotation(request: RotateImageRequest) -> Result<RotateImageResponse, String> {
-    let full_url = format!("{}/api/images/rotate", API_BASE_URL);
-
-    let body_json = serde_json::to_string(&request)
-        .map_err(|e| format!("Failed to serialize request: {}", e))?;
-
-    let mut http_request = ehttp::Request::post(full_url, body_json.into_bytes());
-    http_request.headers.insert("Content-Type".to_string(), "application/json".to_string());
-
-    let response = ehttp::fetch_async(http_request)
-        .await
-        .map_err(|e| format!("Network error: {}", e))?;
-
-    if !response.ok {
-        // Try to parse error response
-        if let Ok(error_response) = serde_json::from_slice::<ErrorResponse>(&response.bytes) {
-            return Err(format!("{}", error_response.error));
-        }
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
-    }
-
-    let rotate_response: RotateImageResponse = serde_json::from_slice(&response.bytes)
-        .map_err(|e| format!("JSON parse error: {}", e))?;
-
-    Ok(rotate_response)
+    post_json_with_credentials("/api/images/rotate", &request).await
 }
 
 async fn send_artifact_update(request: UpdateArtifactRequest) -> Result<UpdateArtifactResponse, String> {
-    let full_url = format!("{}/api/artifacts/update", API_BASE_URL);
-
-    let body_json = serde_json::to_string(&request)
-        .map_err(|e| format!("Failed to serialize request: {}", e))?;
-
-    let mut http_request = ehttp::Request::post(full_url, body_json.into_bytes());
-    http_request.headers.insert("Content-Type".to_string(), "application/json".to_string());
-
-    let response = ehttp::fetch_async(http_request)
-        .await
-        .map_err(|e| format!("Network error: {}", e))?;
-
-    if !response.ok {
-        if let Ok(error_response) = serde_json::from_slice::<ErrorResponse>(&response.bytes) {
-            return Err(error_response.error);
-        }
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
-    }
-
-    serde_json::from_slice(&response.bytes)
-        .map_err(|e| format!("JSON parse error: {}", e))
+    post_json_with_credentials("/api/artifacts/update", &request).await
 }
 
 async fn send_merge_request(request: MergeArtifactsRequest) -> Result<MergeArtifactsResponse, String> {
-    let full_url = format!("{}/api/artifacts/merge", API_BASE_URL);
-
-    let body_json = serde_json::to_string(&request)
-        .map_err(|e| format!("Failed to serialize request: {}", e))?;
-
-    let mut http_request = ehttp::Request::post(full_url, body_json.into_bytes());
-    http_request.headers.insert("Content-Type".to_string(), "application/json".to_string());
-
-    let response = ehttp::fetch_async(http_request)
-        .await
-        .map_err(|e| format!("Network error: {}", e))?;
-
-    if !response.ok {
-        if let Ok(error_response) = serde_json::from_slice::<ErrorResponse>(&response.bytes) {
-            return Err(error_response.error);
-        }
-        return Err(format!(
-            "HTTP error: {} {}",
-            response.status, response.status_text
-        ));
-    }
-
-    serde_json::from_slice(&response.bytes)
-        .map_err(|e| format!("JSON parse error: {}", e))
+    post_json_with_credentials("/api/artifacts/merge", &request).await
 }
 
 /// Decode image using Rust image crate (used for thumbnails).
