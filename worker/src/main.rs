@@ -7,9 +7,9 @@ use axum::{
 };
 use common::{
     ArtifactImages, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse,
-    HistoryData, ImageListResponse, LoginRequest, LoginResponse, MeResponse,
-    MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse,
-    ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse,
+    HistoryData, ImageListResponse, LoginRequest, LoginResponse, MeResponse, MergeArtifactsRequest,
+    MergeArtifactsResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest,
+    ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse,
 };
 use rand::Rng;
 use std::collections::HashMap;
@@ -18,10 +18,7 @@ use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
-const USERS: &[(&str, &str)] = &[
-    ("testuser", "testpassword"),
-    // Add more users here
-];
+include!("users.rs");
 
 #[derive(Clone)]
 struct AppState {
@@ -89,7 +86,11 @@ fn generate_session_token() -> String {
 
 fn session_cookie(token: &str, clear: bool) -> String {
     let max_age = if clear { 0 } else { 2592000 }; // 30 days
-    let secure = if cfg!(debug_assertions) { "" } else { "; Secure" };
+    let secure = if cfg!(debug_assertions) {
+        ""
+    } else {
+        "; Secure"
+    };
     format!(
         "session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}{}",
         token, max_age, secure
@@ -100,16 +101,18 @@ fn read_history(data_path: &Path) -> Result<HistoryData, String> {
     let history_file = data_path.join("history.toml");
     let content = std::fs::read_to_string(&history_file)
         .map_err(|e| format!("Failed to read {}: {}", history_file.display(), e))?;
-    toml::from_str(&content)
-        .map_err(|e| format!("Failed to parse history.toml: {}", e))
+    toml::from_str(&content).map_err(|e| format!("Failed to parse history.toml: {}", e))
 }
 
 #[tokio::main]
 async fn main() {
     let data_path = std::env::var("DATA_PATH").unwrap_or_else(|_| "../data".to_string());
-    let images_path = std::env::var("IMAGES_PATH").unwrap_or_else(|_| "../images/lossless".to_string());
-    let thumbs_path = std::env::var("THUMBS_PATH").unwrap_or_else(|_| "../images/thumbs".to_string());
-    let frontend_path = std::env::var("FRONTEND_PATH").unwrap_or_else(|_| "../frontend/dist".to_string());
+    let images_path =
+        std::env::var("IMAGES_PATH").unwrap_or_else(|_| "../images/lossless".to_string());
+    let thumbs_path =
+        std::env::var("THUMBS_PATH").unwrap_or_else(|_| "../images/thumbs".to_string());
+    let frontend_path =
+        std::env::var("FRONTEND_PATH").unwrap_or_else(|_| "../frontend/dist".to_string());
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
@@ -117,10 +120,13 @@ async fn main() {
 
     // Validate history.toml is readable at startup
     let data_path = PathBuf::from(&data_path);
-    let history = read_history(&data_path)
-        .unwrap_or_else(|e| panic!("{}", e));
-    eprintln!("Loaded {} images, {} artifacts from {}",
-        history.images.len(), history.artifacts.len(), data_path.join("history.toml").display());
+    let history = read_history(&data_path).unwrap_or_else(|e| panic!("{}", e));
+    eprintln!(
+        "Loaded {} images, {} artifacts from {}",
+        history.images.len(),
+        history.artifacts.len(),
+        data_path.join("history.toml").display()
+    );
 
     let state = AppState {
         data_path,
@@ -132,12 +138,16 @@ async fn main() {
 
     // Serve frontend static files with index.html fallback for SPA routing
     let index_file = PathBuf::from(&frontend_path).join("index.html");
-    let serve_frontend = ServeDir::new(&frontend_path)
-        .not_found_service(ServeFile::new(&index_file));
+    let serve_frontend =
+        ServeDir::new(&frontend_path).not_found_service(ServeFile::new(&index_file));
 
     let cors = if cfg!(debug_assertions) {
         CorsLayer::new()
-            .allow_origin("http://localhost:8080".parse::<axum::http::HeaderValue>().unwrap())
+            .allow_origin(
+                "http://localhost:8080"
+                    .parse::<axum::http::HeaderValue>()
+                    .unwrap(),
+            )
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any)
             .allow_credentials(true)
@@ -180,11 +190,12 @@ async fn login(
     State(state): State<AppState>,
     Json(request): Json<LoginRequest>,
 ) -> impl IntoResponse {
-    let valid = USERS
+    let canonical_username = USERS
         .iter()
-        .any(|(u, p)| *u == request.username && *p == request.password);
+        .find(|(u, p)| u.eq_ignore_ascii_case(&request.username) && *p == request.password)
+        .map(|(u, _)| *u);
 
-    if !valid {
+    let Some(canonical_username) = canonical_username else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(LoginResponse {
@@ -193,12 +204,12 @@ async fn login(
             }),
         )
             .into_response();
-    }
+    };
 
     let token = generate_session_token();
     {
         let mut sessions = state.sessions.lock().await;
-        sessions.insert(token.clone(), request.username.clone());
+        sessions.insert(token.clone(), canonical_username.to_string());
     }
 
     let mut headers = HeaderMap::new();
@@ -212,16 +223,13 @@ async fn login(
         headers,
         Json(LoginResponse {
             success: true,
-            username: request.username,
+            username: canonical_username.to_string(),
         }),
     )
         .into_response()
 }
 
-async fn logout(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn logout(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
     // Extract session token from cookie
     let cookie_header = headers
         .get(header::COOKIE)
@@ -243,7 +251,12 @@ async fn logout(
         session_cookie("", true).parse().unwrap(),
     );
 
-    (StatusCode::OK, resp_headers, Json(serde_json::json!({"success": true}))).into_response()
+    (
+        StatusCode::OK,
+        resp_headers,
+        Json(serde_json::json!({"success": true})),
+    )
+        .into_response()
 }
 
 async fn me(user: AuthenticatedUser) -> Json<MeResponse> {
@@ -252,12 +265,12 @@ async fn me(user: AuthenticatedUser) -> Json<MeResponse> {
     })
 }
 
-async fn images_list(
-    _user: AuthenticatedUser,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn images_list(_user: AuthenticatedUser, State(state): State<AppState>) -> impl IntoResponse {
     match read_history(&state.data_path) {
-        Ok(history) => Json(ImageListResponse { images: history.images }).into_response(),
+        Ok(history) => Json(ImageListResponse {
+            images: history.images,
+        })
+        .into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     }
 }
@@ -267,7 +280,10 @@ async fn artifacts_list(
     State(state): State<AppState>,
 ) -> impl IntoResponse {
     match read_history(&state.data_path) {
-        Ok(history) => Json(ArtifactListResponse { artifacts: history.artifacts }).into_response(),
+        Ok(history) => Json(ArtifactListResponse {
+            artifacts: history.artifacts,
+        })
+        .into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     }
 }
@@ -348,7 +364,8 @@ async fn full_image(
                 StatusCode::OK,
                 [("content-type", "application/octet-stream")],
                 bytes,
-            ).into_response(),
+            )
+                .into_response(),
             Err(_) => (StatusCode::NOT_FOUND, "Image not found").into_response(),
         },
         None => (StatusCode::NOT_FOUND, "Image not found").into_response(),
@@ -367,24 +384,36 @@ async fn rotate(
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: e,
-                    error_type: "read_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: e,
+                        error_type: "read_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
-    let idx = match history.images.iter().position(|img| img.key == request.image_key) {
+    let idx = match history
+        .images
+        .iter()
+        .position(|img| img.key == request.image_key)
+    {
         Some(i) => i,
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Image not found: {}", request.image_key),
-                    error_type: "not_found".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Image not found: {}", request.image_key),
+                        error_type: "not_found".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
@@ -402,47 +431,77 @@ async fn rotate(
             if let Err(e) = tokio::fs::write(&history_file, &toml_str).await {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::to_value(ErrorResponse {
-                        error: format!("Failed to write history.toml: {}", e),
-                        error_type: "io_error".to_string(),
-                    }).unwrap()),
-                ).into_response();
+                    Json(
+                        serde_json::to_value(ErrorResponse {
+                            error: format!("Failed to write history.toml: {}", e),
+                            error_type: "io_error".to_string(),
+                        })
+                        .unwrap(),
+                    ),
+                )
+                    .into_response();
             }
         }
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Failed to format history.toml: {}", e),
-                    error_type: "format_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Failed to format history.toml: {}", e),
+                        error_type: "format_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     }
 
     (
         StatusCode::OK,
-        Json(serde_json::to_value(RotateImageResponse {
-            success: true,
-            old_rotation,
-            new_rotation: request.new_rotation,
-        }).unwrap()),
-    ).into_response()
+        Json(
+            serde_json::to_value(RotateImageResponse {
+                success: true,
+                old_rotation,
+                new_rotation: request.new_rotation,
+            })
+            .unwrap(),
+        ),
+    )
+        .into_response()
 }
 
 fn is_valid_date_format(s: &str) -> bool {
     // Match YYYY, YYYY-MM, or YYYY-MM-DD
     let bytes = s.as_bytes();
-    if bytes.len() < 4 { return false; }
-    if !bytes[0..4].iter().all(|b| b.is_ascii_digit()) { return false; }
-    if bytes.len() == 4 { return true; }
-    if bytes.len() < 7 || bytes[4] != b'-' { return false; }
-    if !bytes[5..7].iter().all(|b| b.is_ascii_digit()) { return false; }
+    if bytes.len() < 4 {
+        return false;
+    }
+    if !bytes[0..4].iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    if bytes.len() == 4 {
+        return true;
+    }
+    if bytes.len() < 7 || bytes[4] != b'-' {
+        return false;
+    }
+    if !bytes[5..7].iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
     let month: u8 = s[5..7].parse().unwrap_or(0);
-    if !(1..=12).contains(&month) { return false; }
-    if bytes.len() == 7 { return true; }
-    if bytes.len() != 10 || bytes[7] != b'-' { return false; }
-    if !bytes[8..10].iter().all(|b| b.is_ascii_digit()) { return false; }
+    if !(1..=12).contains(&month) {
+        return false;
+    }
+    if bytes.len() == 7 {
+        return true;
+    }
+    if bytes.len() != 10 || bytes[7] != b'-' {
+        return false;
+    }
+    if !bytes[8..10].iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
     let day: u8 = s[8..10].parse().unwrap_or(0);
     (1..=31).contains(&day)
 }
@@ -456,11 +515,15 @@ async fn update_artifact(
     if request.reason.trim().is_empty() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::to_value(ErrorResponse {
-                error: "Reason is required".to_string(),
-                error_type: "validation_error".to_string(),
-            }).unwrap()),
-        ).into_response();
+            Json(
+                serde_json::to_value(ErrorResponse {
+                    error: "Reason is required".to_string(),
+                    error_type: "validation_error".to_string(),
+                })
+                .unwrap(),
+            ),
+        )
+            .into_response();
     }
 
     // Validate date format if provided
@@ -468,11 +531,18 @@ async fn update_artifact(
         if !is_valid_date_format(date) {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Invalid date format: '{}'. Expected YYYY, YYYY-MM, or YYYY-MM-DD", date),
-                    error_type: "validation_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!(
+                            "Invalid date format: '{}'. Expected YYYY, YYYY-MM, or YYYY-MM-DD",
+                            date
+                        ),
+                        error_type: "validation_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     }
 
@@ -483,24 +553,36 @@ async fn update_artifact(
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: e,
-                    error_type: "read_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: e,
+                        error_type: "read_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
-    let idx = match history.artifacts.iter().position(|a| a.id == request.artifact_id) {
+    let idx = match history
+        .artifacts
+        .iter()
+        .position(|a| a.id == request.artifact_id)
+    {
         Some(i) => i,
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Artifact not found: {}", request.artifact_id),
-                    error_type: "not_found".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Artifact not found: {}", request.artifact_id),
+                        error_type: "not_found".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
@@ -522,31 +604,43 @@ async fn update_artifact(
             if let Err(e) = tokio::fs::write(&history_file, &toml_str).await {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::to_value(ErrorResponse {
-                        error: format!("Failed to write history.toml: {}", e),
-                        error_type: "io_error".to_string(),
-                    }).unwrap()),
-                ).into_response();
+                    Json(
+                        serde_json::to_value(ErrorResponse {
+                            error: format!("Failed to write history.toml: {}", e),
+                            error_type: "io_error".to_string(),
+                        })
+                        .unwrap(),
+                    ),
+                )
+                    .into_response();
             }
         }
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Failed to format history.toml: {}", e),
-                    error_type: "format_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Failed to format history.toml: {}", e),
+                        error_type: "format_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     }
 
     (
         StatusCode::OK,
-        Json(serde_json::to_value(UpdateArtifactResponse {
-            success: true,
-            update,
-        }).unwrap()),
-    ).into_response()
+        Json(
+            serde_json::to_value(UpdateArtifactResponse {
+                success: true,
+                update,
+            })
+            .unwrap(),
+        ),
+    )
+        .into_response()
 }
 
 async fn merge_artifacts(
@@ -557,11 +651,15 @@ async fn merge_artifacts(
     if request.leader_id == request.follower_id {
         return (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::to_value(ErrorResponse {
-                error: "Cannot merge an artifact with itself".to_string(),
-                error_type: "validation_error".to_string(),
-            }).unwrap()),
-        ).into_response();
+            Json(
+                serde_json::to_value(ErrorResponse {
+                    error: "Cannot merge an artifact with itself".to_string(),
+                    error_type: "validation_error".to_string(),
+                })
+                .unwrap(),
+            ),
+        )
+            .into_response();
     }
 
     let _lock = state.write_lock.lock().await;
@@ -571,37 +669,57 @@ async fn merge_artifacts(
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: e,
-                    error_type: "read_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: e,
+                        error_type: "read_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
-    let leader_idx = match history.artifacts.iter().position(|a| a.id == request.leader_id) {
+    let leader_idx = match history
+        .artifacts
+        .iter()
+        .position(|a| a.id == request.leader_id)
+    {
         Some(i) => i,
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Leader artifact not found: {}", request.leader_id),
-                    error_type: "not_found".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Leader artifact not found: {}", request.leader_id),
+                        error_type: "not_found".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
-    let follower_idx = match history.artifacts.iter().position(|a| a.id == request.follower_id) {
+    let follower_idx = match history
+        .artifacts
+        .iter()
+        .position(|a| a.id == request.follower_id)
+    {
         Some(i) => i,
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Follower artifact not found: {}", request.follower_id),
-                    error_type: "not_found".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Follower artifact not found: {}", request.follower_id),
+                        error_type: "not_found".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     };
 
@@ -611,18 +729,26 @@ async fn merge_artifacts(
 
     // Merge images: leader fronts + follower fronts, leader backs + follower backs
     let merged_images = ArtifactImages {
-        fronts: leader.images.fronts.iter()
+        fronts: leader
+            .images
+            .fronts
+            .iter()
             .chain(follower.images.fronts.iter())
             .cloned()
             .collect(),
-        backs: leader.images.backs.iter()
+        backs: leader
+            .images
+            .backs
+            .iter()
             .chain(follower.images.backs.iter())
             .cloned()
             .collect(),
     };
 
     // Merge updates: combine both, sort by timestamp, then add merge note
-    let mut merged_updates: Vec<ArtifactUpdate> = leader.updates.iter()
+    let mut merged_updates: Vec<ArtifactUpdate> = leader
+        .updates
+        .iter()
         .chain(follower.updates.iter())
         .cloned()
         .collect();
@@ -631,7 +757,10 @@ async fn merge_artifacts(
     merged_updates.push(ArtifactUpdate {
         author: "system".to_string(),
         updated: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-        reason: format!("Merged artifact #{} into this artifact", request.follower_id),
+        reason: format!(
+            "Merged artifact #{} into this artifact",
+            request.follower_id
+        ),
         date: None,
         tags: None,
         people: None,
@@ -645,7 +774,9 @@ async fn merge_artifacts(
     // Remove follower
     history.artifacts.retain(|a| a.id != request.follower_id);
 
-    let merged_artifact = history.artifacts.iter()
+    let merged_artifact = history
+        .artifacts
+        .iter()
         .find(|a| a.id == request.leader_id)
         .unwrap()
         .clone();
@@ -657,29 +788,41 @@ async fn merge_artifacts(
             if let Err(e) = tokio::fs::write(&history_file, &toml_str).await {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::to_value(ErrorResponse {
-                        error: format!("Failed to write history.toml: {}", e),
-                        error_type: "io_error".to_string(),
-                    }).unwrap()),
-                ).into_response();
+                    Json(
+                        serde_json::to_value(ErrorResponse {
+                            error: format!("Failed to write history.toml: {}", e),
+                            error_type: "io_error".to_string(),
+                        })
+                        .unwrap(),
+                    ),
+                )
+                    .into_response();
             }
         }
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::to_value(ErrorResponse {
-                    error: format!("Failed to format history.toml: {}", e),
-                    error_type: "format_error".to_string(),
-                }).unwrap()),
-            ).into_response();
+                Json(
+                    serde_json::to_value(ErrorResponse {
+                        error: format!("Failed to format history.toml: {}", e),
+                        error_type: "format_error".to_string(),
+                    })
+                    .unwrap(),
+                ),
+            )
+                .into_response();
         }
     }
 
     (
         StatusCode::OK,
-        Json(serde_json::to_value(MergeArtifactsResponse {
-            success: true,
-            merged_artifact,
-        }).unwrap()),
-    ).into_response()
+        Json(
+            serde_json::to_value(MergeArtifactsResponse {
+                success: true,
+                merged_artifact,
+            })
+            .unwrap(),
+        ),
+    )
+        .into_response()
 }
