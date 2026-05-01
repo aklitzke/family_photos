@@ -1476,13 +1476,6 @@ impl eframe::App for FamilyPhotosApp {
                                 ui.label("Updating...");
                             }
 
-                            ui.add_space(20.0);
-                            ui.separator();
-                            ui.add_space(10.0);
-
-                            // Placeholder for EXIF data
-                            ui.heading("Image Info");
-                            ui.label("EXIF data will appear here");
                         });
 
                     // Main image area
@@ -2537,7 +2530,7 @@ impl eframe::App for FamilyPhotosApp {
                                         ui.add_space(5.0);
 
                                         // Filter artifacts by search query
-                                        let filtered_artifacts: Vec<&Artifact> = if self.artifacts_search_query.is_empty() {
+                                        let mut filtered_artifacts: Vec<&Artifact> = if self.artifacts_search_query.is_empty() {
                                             artifacts.iter().collect()
                                         } else {
                                             let query = self.artifacts_search_query.to_lowercase();
@@ -2545,6 +2538,18 @@ impl eframe::App for FamilyPhotosApp {
                                                 .filter(|a| artifact_matches_query(a, &query))
                                                 .collect()
                                         };
+                                        filtered_artifacts.sort_by(|a, b| {
+                                            let sort_key = |art: &Artifact| -> String {
+                                                if !art.images.fronts.is_empty() {
+                                                    art.images.fronts[0].clone()
+                                                } else if !art.images.backs.is_empty() {
+                                                    art.images.backs[0].clone()
+                                                } else {
+                                                    format!("\u{FFFF}{}", art.id)
+                                                }
+                                            };
+                                            sort_key(a).cmp(&sort_key(b))
+                                        });
 
                                         if self.artifacts_search_query.is_empty() {
                                             ui.label(format!("{} artifacts", filtered_artifacts.len()));
@@ -2585,13 +2590,15 @@ impl eframe::App for FamilyPhotosApp {
                                             .column(Column::exact(120.0))
                                             .column(Column::exact(150.0))
                                             .column(Column::exact(150.0))
-                                            .column(Column::remainder().at_least(150.0))
+                                            .column(Column::exact(150.0))
+                                            .column(Column::remainder().at_least(200.0))
                                             .header(30.0, |mut header| {
                                                 header.col(|ui| { ui.strong("Thumbnail"); });
                                                 header.col(|ui| { ui.strong("Date"); });
                                                 header.col(|ui| { ui.strong("Tags"); });
                                                 header.col(|ui| { ui.strong("People"); });
                                                 header.col(|ui| { ui.strong("Location"); });
+                                                header.col(|ui| { ui.strong("Image Key"); });
                                             })
                                             .body(|body| {
                                                 body.rows(thumbnail_height, filtered_artifacts.len(), |mut row| {
@@ -2690,6 +2697,19 @@ impl eframe::App for FamilyPhotosApp {
                                                         let location_label = artifact_location(artifact)
                                                             .unwrap_or("—");
                                                         if ui.selectable_label(false, location_label).clicked() {
+                                                            clicked = true;
+                                                        }
+                                                    });
+
+                                                    row.col(|ui| {
+                                                        let image_key = if !artifact.images.fronts.is_empty() {
+                                                            artifact.images.fronts[0].clone()
+                                                        } else if !artifact.images.backs.is_empty() {
+                                                            artifact.images.backs[0].clone()
+                                                        } else {
+                                                            artifact.id.to_string()
+                                                        };
+                                                        if ui.selectable_label(false, &image_key).clicked() {
                                                             clicked = true;
                                                         }
                                                     });

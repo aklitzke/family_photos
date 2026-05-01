@@ -1170,6 +1170,12 @@ id = 201
 images.front1 = "Family History/Pile 27 Picture Book/FastFoto_1359"
 images.back1 = "Family History/Pile 27 Picture Book/FastFoto_1359_b"
 
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T02:59:33Z"
+reason = "thats her"
+people = ["Jeanette Jossi"]
+
 [[artifacts]]
 id = 202
 images.front1 = "Family History/Pile 7 Again/FastFoto_1741"
@@ -1406,6 +1412,13 @@ images.front2 = "Family History/Pile 4 Again/FastFoto_0170"
 id = 248
 images.front1 = "Family History/Pile 20 Vacations With Others Box/FastFoto_0780"
 images.back1 = "Family History/Pile 20 Vacations With Others Box/FastFoto_0780_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:25:40Z"
+reason = "me skiing!"
+tags = ["ski"]
+people = ["Andrew Klitzke"]
 
 [[artifacts]]
 id = 249
@@ -1856,6 +1869,14 @@ id = 336
 images.front1 = "Family History/Pile 12/FastFoto_0449"
 images.back1 = "Family History/Pile 12/FastFoto_0449_b"
 
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:04:16Z"
+reason = "I remember getting the bench and flagpole when we were kids. Guessing this pic is from 1996 - 2003"
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 337
 images.front1 = "Family History/Pile 27 Picture Book/FastFoto_1185"
@@ -2217,6 +2238,15 @@ id = 408
 images.front1 = "Family History/Pile 13/FastFoto_0501"
 images.back1 = "Family History/Pile 13/FastFoto_0501_b"
 
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:59:37Z"
+reason = "laura in girl scouts"
+people = ["Laura Klitzke"]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 409
 images.front1 = "Family History/Pile 7 Again/FastFoto_1800"
@@ -2226,6 +2256,14 @@ images.back1 = "Family History/Pile 7 Again/FastFoto_1800_b"
 id = 410
 images.front1 = "Family History/Pile 16/FastFoto_0656"
 images.back1 = "Family History/Pile 16/FastFoto_0656_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:12:33Z"
+reason = "backyard, original deck with built-in bench"
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 411
@@ -2438,6 +2476,21 @@ images.front2 = "Family History/Pile 4 Again/FastFoto_0173"
 id = 452
 images.front1 = "Family History/Pile 15/FastFoto_0582"
 images.back1 = "Family History/Pile 15/FastFoto_0582_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:01:02Z"
+reason = "ye old wood burning stove, later replaced with carpet and a window"
+people = ["Jeanette Jossi"]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:01:23Z"
+reason = "date on back"
+date = "1992"
 
 [[artifacts]]
 id = 453
@@ -2659,6 +2712,18 @@ images.back1 = "Family History/Pile 4 Again/FastFoto_0215_b"
 id = 496
 images.front1 = "Family History/Pile 12/FastFoto_0339"
 images.back1 = "Family History/Pile 12/FastFoto_0339_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:45:01Z"
+reason = "Laura Playing Piano"
+people = [
+    "Holly (Cat)",
+    "Laura Klitzke",
+]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 497
@@ -5572,6 +5637,22 @@ id = 1073
 images.front1 = "Family History/Pile 12/FastFoto_0365"
 images.back1 = "Family History/Pile 12/FastFoto_0365_b"
 
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:48:33Z"
+reason = """
+Steve trying to put a wig on me? lol
+
+Barometer in the background made its way from melvin -> this pic -> laura (who gave it away as a white elephant gift in 2025) -> me"""
+people = [
+    "Andrew Klitzke",
+    "Lucas Bennewitz",
+    "Steven Just",
+]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 1074
 images.front1 = "Family History/Pile 22 Trash Box On Fridge/FastFoto_0872"
@@ -5676,6 +5757,17 @@ images.back1 = "Family History/Pile 6 Again/FastFoto_1710_b"
 id = 1094
 images.front1 = "Family History/Pile 16/FastFoto_0642"
 images.back1 = "Family History/Pile 16/FastFoto_0642_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:06:19Z"
+reason = "We took that trip over j-term my freshman year of college"
+date = "2009"
+people = [
+    "Andrew Klitzke",
+    "Jeanette Jossi",
+]
+location = "Amsterdam"
 
 [[artifacts]]
 id = 1095
@@ -6206,6 +6298,15 @@ id = 1193
 images.front1 = "Family History/Pile 27 Picture Book/FastFoto_1281"
 images.back1 = "Family History/Pile 27 Picture Book/FastFoto_1281_b"
 
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:09:14Z"
+reason = "top of steps, not sure who this other person is"
+people = ["Andrew Klitzke"]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
+
 [[artifacts]]
 id = 1194
 images.front1 = "Family History/Pile 27 Picture Book/FastFoto_1304"
@@ -6220,6 +6321,15 @@ images.back1 = "Family History/Pile 7 Again/FastFoto_1816_b"
 id = 1196
 images.front1 = "Family History/Pile 12/FastFoto_0356"
 images.back1 = "Family History/Pile 12/FastFoto_0356_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:42:46Z"
+reason = "Me sailing"
+people = ["Andrew Klitzke"]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 1197
@@ -6276,6 +6386,14 @@ images.back1 = "Family History/Pile 15/FastFoto_0589_b"
 id = 1207
 images.front1 = "Family History/Pile 16/FastFoto_0640"
 images.back1 = "Family History/Pile 16/FastFoto_0640_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:05:17Z"
+reason = "ski trip"
+date = "2006"
+people = ["Nic Badertscher"]
+location = "Ski Brule"
 
 [[artifacts]]
 id = 1208
@@ -6358,6 +6476,18 @@ images.back1 = "Family History/Pile 27 Picture Book/FastFoto_1289_b"
 id = 1222
 images.front1 = "Family History/Pile 5 Again/FastFoto_0284"
 images.back1 = "Family History/Pile 5 Again/FastFoto_0284_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T03:35:44Z"
+reason = "playing drums"
+people = [
+    "Ben Jossi",
+    "Robert Klitzke",
+]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 1223
@@ -6575,6 +6705,13 @@ images.back1 = "Family History/Pile 20 Vacations With Others Box/FastFoto_0782_b
 id = 1263
 images.front1 = "Family History/Pile 16/FastFoto_0641"
 images.back1 = "Family History/Pile 16/FastFoto_0641_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:04:47Z"
+reason = "One of the ski trips nic and I took with mom to brule. Could have been 05 or 06"
+date = "2006"
+location = "Ski Brule"
 
 [[artifacts]]
 id = 1264
@@ -7711,6 +7848,12 @@ id = 1486
 images.front1 = "Family History/Pile 12/FastFoto_0336"
 images.back1 = "Family History/Pile 12/FastFoto_0336_b"
 
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T02:59:02Z"
+reason = "thats her"
+people = ["Katherine Jossi"]
+
 [[artifacts]]
 id = 1487
 images.front1 = "Family History/Pile 7 Again/FastFoto_1875"
@@ -7891,6 +8034,18 @@ images.back1 = "Family History/Pile 26 Bobs Envelope From Ext Family/FastFoto_10
 id = 1520
 images.front1 = "Family History/Pile 16/FastFoto_0625"
 images.back1 = "Family History/Pile 16/FastFoto_0625_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:02:59Z"
+reason = "Squirt guns fight or something"
+people = [
+    "Andrew Klitzke",
+    "Steven Just",
+]
+location = """
+Klitzke Family Home
+2850 S 152nd St, New Berlin, WI 53151"""
 
 [[artifacts]]
 id = 1521
@@ -9274,6 +9429,13 @@ images.back1 = "Family History/Pile 28 Chocolate Box/FastFoto_1389_b"
 id = 1794
 images.front1 = "Family History/Pile 16/FastFoto_0645"
 images.back1 = "Family History/Pile 16/FastFoto_0645_b"
+
+[[artifacts.updates]]
+author = "AndrewKlitzke"
+updated = "2026-05-01T04:11:48Z"
+reason = "My music (right) and art (left) teachers in elementary school, likely after a presentation to parents aka 'fine arts night'"
+people = ["Andrew Klitzke"]
+location = "Cleveland Heights Elementary"
 
 [[artifacts]]
 id = 1795
@@ -20216,6 +20378,7 @@ rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1162_b"
+rotation = 180
 
 [[images]]
 key = "Family History/Pile 27 Picture Book/FastFoto_1163"
