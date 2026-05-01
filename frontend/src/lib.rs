@@ -1,4 +1,5 @@
-use common::{artifact_date, artifact_location, artifact_people, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, HealthResponse, ImageListResponse, ImageMetadata, LoginRequest, LoginResponse, MeResponse, MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
+use common::{artifact_date, artifact_location, artifact_people, artifact_tags, Artifact, ArtifactListResponse, ArtifactUpdate, ErrorResponse, ImageListResponse, ImageMetadata, LoginRequest, LoginResponse, MeResponse, MergeArtifactsRequest, MergeArtifactsResponse, RotateImageRequest, RotateImageResponse, ThumbnailBatchRequest, ThumbnailBatchResponse, UpdateArtifactRequest, UpdateArtifactResponse};
+
 use eframe::egui::{self, ColorImage, TextureHandle};
 use eframe::epaint::Vec2;
 use std::collections::HashMap;
@@ -29,7 +30,6 @@ struct FullImageLoaded {
 enum Page {
     Images,
     Artifacts,
-    Health,
 }
 
 #[derive(Clone)]
@@ -217,7 +217,6 @@ struct FamilyPhotosApp {
     full_images_loading: HashMap<String, Arc<Mutex<LoadState<FullImageLoaded>>>>,
     full_image_failures: HashMap<String, String>,  // Track permanent failures
     zoom_controller: ZoomController,
-    health: AsyncResource<HealthResponse>,
     rotation_updating: HashMap<String, bool>,  // Track images being rotated
     rotation_promises: HashMap<String, Arc<Mutex<LoadState<RotateImageResponse>>>>,  // Track rotation update promises
     toast_message: Option<(String, bool)>,     // (message, is_error)
@@ -293,7 +292,6 @@ impl FamilyPhotosApp {
             full_images_loading: HashMap::new(),
             full_image_failures: HashMap::new(),
             zoom_controller: ZoomController::new(),
-            health: AsyncResource::new(),
             rotation_updating: HashMap::new(),
             rotation_promises: HashMap::new(),
             toast_message: None,
@@ -359,7 +357,6 @@ impl FamilyPhotosApp {
                 let parts: Vec<&str> = location.trim_matches('/').split('/').collect();
                 return match parts.get(0) {
                     Some(&"images") => Page::Images,
-                    Some(&"health") => Page::Health,
                     _ => Page::Artifacts,
                 };
             }
@@ -401,7 +398,6 @@ impl FamilyPhotosApp {
         let path = match page {
             Page::Images => "/images".to_string(),
             Page::Artifacts => "/artifacts".to_string(),
-            Page::Health => "/health".to_string(),
         };
         let _ = history.push_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&path));
     }
@@ -642,28 +638,6 @@ impl FamilyPhotosApp {
         });
     }
 
-    fn load_health(&mut self, ctx: &egui::Context) {
-        if self.health.is_loading() || !self.health.is_not_started() {
-            return;
-        }
-
-        let health_state = self.health.start_loading();
-        let ctx_clone = ctx.clone();
-
-        wasm_bindgen_futures::spawn_local(async move {
-            match fetch_json::<HealthResponse>("/api/health").await {
-                Ok(response) => {
-                    *health_state.lock().unwrap() = LoadState::Loaded(response);
-                    ctx_clone.request_repaint();
-                }
-                Err(e) => {
-                    *health_state.lock().unwrap() = LoadState::Failed(e);
-                    ctx_clone.request_repaint();
-                }
-            }
-        });
-    }
-
     fn close_image_view(&mut self) {
         self.zoom_controller.reset();
         // Use browser back navigation to return to previous page
@@ -790,7 +764,6 @@ impl FamilyPhotosApp {
                         // Clear loaded data
                         self.images = AsyncResource::new();
                         self.artifacts = AsyncResource::new();
-                        self.health = AsyncResource::new();
                         self.thumbnails.clear();
                         self.full_images.clear();
                         self.full_images_bytes.clear();
@@ -807,9 +780,6 @@ impl FamilyPhotosApp {
                     self.navigate_to_page(Page::Images);
                 }
 
-                if ui.selectable_label(self.get_current_page() == Page::Health, "Health").clicked() {
-                    self.navigate_to_page(Page::Health);
-                }
             });
     }
 
@@ -1301,7 +1271,6 @@ impl eframe::App for FamilyPhotosApp {
         self.artifacts.process();
         self.process_loaded_thumbnails(ctx);
         self.process_loaded_full_images(ctx);
-        self.health.process();
         self.process_rotation_updates();
         self.process_artifact_updates();
         self.process_merge();
@@ -1329,11 +1298,6 @@ impl eframe::App for FamilyPhotosApp {
                 // Artifacts page (both list and detail) needs images list for rotation metadata
                 if matches!(self.images.get(), LoadState::NotStarted) {
                     self.load_image_list(ctx);
-                }
-            }
-            Page::Health => {
-                if matches!(self.health.get(), LoadState::NotStarted) {
-                    self.load_health(ctx);
                 }
             }
         }
@@ -2745,37 +2709,6 @@ impl eframe::App for FamilyPhotosApp {
                                 }
                             });
                         }
-                    }
-                    Page::Health => {
-                        ui.vertical_centered(|ui| {
-                            ui.add_space(40.0);
-
-                            ui.heading(egui::RichText::new("Health Check").size(48.0).strong());
-
-                            ui.add_space(30.0);
-
-                            if matches!(self.health.get(), LoadState::NotStarted) {
-                                self.load_health(ctx);
-                            }
-
-                            match self.health.get().clone() {
-                                LoadState::Loading => {
-                                    ui.label(egui::RichText::new("Loading...").size(20.0));
-                                }
-                                LoadState::Failed(err) => {
-                                    ui.colored_label(
-                                        egui::Color32::RED,
-                                        egui::RichText::new(format!("Error: {}", err)).size(16.0),
-                                    );
-                                }
-                                LoadState::Loaded(health) => {
-                                    ui.label(egui::RichText::new(format!("Status: {}", health.status)).size(24.0));
-                                    ui.add_space(10.0);
-                                    ui.label(egui::RichText::new(format!("Message: {}", health.message)).size(18.0));
-                                }
-                                LoadState::NotStarted => {}
-                            }
-                        });
                     }
                 }
             });
